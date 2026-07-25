@@ -125,6 +125,10 @@ async function handleEventStream(req: Request, res: Response) {
  * event (emitted by EventListenerService once the record is saved) as a JSON
  * SSE message. The bus listener is removed and the heartbeat cleared when the
  * client disconnects.
+ *
+ * Reconnect assumptions for frontend clients:
+ *  - the stream is live-only (no replay/catch-up on reconnect),
+ *  - clients should reconnect and continue polling status until terminal state.
  */
 function handleTransactionStream(req: Request, res: Response) {
   const txHash = String(req.params.txHash ?? "").trim();
