@@ -12,5 +12,6 @@ Deployment-focused runbooks for the Stellar Wave release program. Each document 
 | [Observability](./observability.md) | CI/CD — observability | #407 |
 | [CI/CD security](./cicd-security.md) | CI/CD — security hardening | #402 |
 | [CI/CD incident management](./incident-management.md) | CI/CD — incident management | #520 |
+| [Stuck payouts incident response](./stuck-payouts.md) | Operations & Support — payouts | #861 |
 
 **Related:** [End-to-end deployment](../deployment.md) · [Contract release & upgrade](../contract-release-and-upgrade-runbook.md) · [Release readiness checklist](../release-readiness-checklist.md) · [SECURITY.md](../../SECURITY.md)
