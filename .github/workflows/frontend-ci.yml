@@ -35,6 +35,9 @@ jobs:
       - name: Verify contract data integrity
         run: npm run verify:data-integrity
 
+      - name: Verify i18n message key parity
+        run: npm run check:i18n -w frontend
+
       - name: Run Lint
         run: npm run lint -w frontend
 

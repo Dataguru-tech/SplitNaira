@@ -2,6 +2,49 @@
 
 Operational guidance for supply-chain alerts, leaked secrets, and pipeline incidents.
 
+## Workflow Permissions Audit
+
+Every workflow declares a read-only `permissions: contents: read` default at the
+top level. Any elevated scope is granted on the specific job that needs it, not
+the whole workflow, so a compromised or buggy step in an unrelated job can't
+inherit write access it doesn't need.
+
+| Workflow | Default | Job-level exception | Why |
+|----------|---------|----------------------|-----|
+| `ci.yml` | `contents: read` | none | Build/test/lint only |
+| `codeql-analysis.yml` | `contents: read`, `security-events: write` | none (single job) | `analyze` job must upload SARIF results |
+| `dependency-audit.yml` | `contents: read` | none | `npm audit` only |
+| `frontend-ci.yml` | `contents: read` | none | Build/test/lint only |
+| `frontend-quality.yml` | `contents: read` | none | Build/test/lint only |
+| `user-onboarding-ci.yml` | `contents: read` | none | Build/test/lint only |
+| `testnet-integration.yml` | `contents: read` | none | Read-only API checks against live testnet |
+| `smoke-testnet.yml` | `contents: read` | none | Read-only contract call against live testnet |
+| `backend-deploy.yml` | `contents: read` | none | Deploys via Render webhook (`curl`); no repo writes |
+| `mainnet-deploy.yml` | `contents: read` | none | Deploys via Render webhook (`curl`); no repo writes |
+| `contract-testnet-deploy.yml` | `contents: read` | `deploy-testnet`: `contents: write` | Commits the redeployed contract id back to the repo |
+| `release.yml` | `contents: read` | `create-release`: `contents: write` | `ncipollo/release-action` publishes a draft GitHub Release |
+
+### Periodic audit checklist
+
+Run this whenever a workflow is added or its jobs/steps change, and at least
+quarterly:
+
+- [ ] Every workflow file has a top-level `permissions:` block (no file relies
+      on the repository/org default token permissions).
+- [ ] The top-level default is `contents: read` unless the workflow has no
+      job that touches repo contents or the GitHub API at all.
+- [ ] Any scope beyond `contents: read` (`contents: write`, `security-events:
+      write`, `id-token: write`, `pull-requests: write`, etc.) is declared on
+      the specific job that needs it, not the workflow default, unless the
+      workflow has exactly one job.
+- [ ] Each such exception is documented (table above + inline comment in the
+      workflow) with the reason it's required.
+- [ ] Deploy and release workflows use a GitHub `environment` (`staging`,
+      `production`, `testnet`) so elevated permissions and secrets are gated
+      by environment protection rules, not just the workflow trigger.
+- [ ] No workflow echoes secrets to logs or passes them to untrusted third-party
+      actions.
+
 ## Pipeline Overview
 
 | Workflow | Purpose | Security gate |

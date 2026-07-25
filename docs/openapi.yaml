@@ -1,0 +1,2625 @@
+openapi: 3.0.0
+info:
+  version: 0.1.0
+  title: SplitNaira API
+  description: Premium royalty management API on Stellar network.
+servers:
+  - url: http://localhost:3001
+components:
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        requestId:
+          type: string
+          description: Request correlation ID
+        details:
+          type: object
+          additionalProperties:
+            nullable: true
+          description: Additional error context
+      required:
+        - error
+      example:
+        error: VALIDATION_ERROR
+        message: collaborators basisPoints must sum to exactly 10000
+        requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        details:
+          path:
+            - collaborators
+    Project:
+      type: object
+      properties:
+        projectId:
+          type: string
+        title:
+          type: string
+        projectType:
+          type: string
+        owner:
+          type: string
+        token:
+          type: string
+        balance:
+          type: string
+        totalDistributed:
+          type: string
+        locked:
+          type: boolean
+        collaborators:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                type: string
+              alias:
+                type: string
+              basisPoints:
+                type: number
+            required:
+              - address
+              - alias
+              - basisPoints
+      required:
+        - projectId
+        - title
+        - projectType
+        - owner
+        - token
+        - balance
+        - totalDistributed
+        - locked
+        - collaborators
+    XdrResponse:
+      type: object
+      properties:
+        xdr:
+          type: string
+        metadata:
+          type: object
+          properties:
+            contractId:
+              type: string
+            networkPassphrase:
+              type: string
+            sourceAccount:
+              type: string
+            operation:
+              type: string
+          required:
+            - contractId
+            - networkPassphrase
+            - sourceAccount
+            - operation
+      required:
+        - xdr
+        - metadata
+    ClaimableResponse:
+      type: object
+      properties:
+        projectId:
+          type: string
+          description: The project ID
+        collaborator:
+          type: string
+          description: Stellar address of the collaborator
+        claimable:
+          type: string
+          description: Amount available to claim, in stroops
+        claimed:
+          type: string
+          description: Amount already claimed, in stroops
+        total:
+          type: string
+          description: Total allocated (claimed + claimable), in stroops
+      required:
+        - projectId
+        - collaborator
+        - claimable
+        - claimed
+        - total
+    AdminStatus:
+      type: object
+      properties:
+        admin:
+          type: string
+          nullable: true
+        isPaused:
+          type: boolean
+      required:
+        - admin
+        - isPaused
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - not_ready
+        uptime:
+          type: number
+          description: Server uptime in seconds
+        timestamp:
+          type: string
+          description: ISO 8601 timestamp
+      required:
+        - status
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+            - not_ready
+        error:
+          type: string
+          description: Error code if not ready
+        message:
+          type: string
+          description: Error message if not ready
+        issues:
+          type: array
+          items:
+            type: string
+          description: List of configuration issues
+        requestId:
+          type: string
+          description: Request ID for tracing
+      required:
+        - status
+    MainnetReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - ready
+            - not_ready
+        requestId:
+          type: string
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: {}
+        components:
+          type: object
+          properties:
+            env:
+              type: object
+              properties:
+                ok:
+                  type: boolean
+                message:
+                  type: string
+                details:
+                  type: object
+                  additionalProperties: {}
+              required:
+                - ok
+            db:
+              type: object
+              properties:
+                ok:
+                  type: boolean
+                message:
+                  type: string
+                details:
+                  type: object
+                  additionalProperties: {}
+              required:
+                - ok
+            cache:
+              type: object
+              properties:
+                ok:
+                  type: boolean
+                message:
+                  type: string
+                details:
+                  type: object
+                  additionalProperties: {}
+              required:
+                - ok
+            deploy:
+              type: object
+              properties:
+                ok:
+                  type: boolean
+                message:
+                  type: string
+                productionSecrets:
+                  type: object
+                  properties:
+                    mainnetContractId:
+                      type: boolean
+                    renderBackendDeployHookUrl:
+                      type: boolean
+                  required:
+                    - mainnetContractId
+                    - renderBackendDeployHookUrl
+                contractIdMatch:
+                  type: boolean
+                databasePoolMax:
+                  type: number
+                readCacheTtlMs:
+                  type: number
+                readCacheMaxEntries:
+                  type: number
+              required:
+                - ok
+          required:
+            - env
+            - db
+            - cache
+            - deploy
+      required:
+        - status
+        - components
+  parameters: {}
+paths:
+  /splits:
+    get:
+      summary: List all split projects
+      description: Returns a paginated list of on-chain split projects with optional
+        search and type filters.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: integer
+            nullable: true
+            minimum: 0
+            default: 0
+          required: false
+          name: start
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          required: false
+          name: limit
+          in: query
+        - schema:
+            type: string
+          required: false
+          name: search
+          in: query
+        - schema:
+            type: string
+          required: false
+          name: type
+          in: query
+        - schema:
+            type: string
+          required: false
+          name: cursor
+          in: query
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      summary: Create a new split project
+      description: Builds an unsigned Soroban transaction XDR to create a new
+        revenue-split project on-chain. The caller must sign the returned XDR
+        with the `owner` wallet and submit it themselves; this endpoint never
+        holds a private key.
+      tags:
+        - Splits
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owner:
+                  type: string
+                  minLength: 1
+                  description: owner
+                projectId:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  pattern: ^[a-zA-Z0-9_]+$
+                title:
+                  type: string
+                projectType:
+                  type: string
+                token:
+                  type: string
+                  minLength: 1
+                  description: token
+                collaborators:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      address:
+                        type: string
+                        minLength: 1
+                      alias:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      basisPoints:
+                        type: integer
+                        minimum: 0
+                        exclusiveMinimum: true
+                        maximum: 10000
+                    required:
+                      - address
+                      - alias
+                      - basisPoints
+                  minItems: 2
+              required:
+                - owner
+                - projectId
+                - title
+                - projectType
+                - token
+                - collaborators
+            example:
+              owner: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+              projectId: afrobeats_001
+              title: Afrobeats Collective Vol. 1
+              projectType: music
+              token: CDOVDY3MZDG7PHCGVP7EP2EKQ2ENV26DZW6FKLBRN42LOGIZGXZV3WX5
+              collaborators:
+                - address: GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV
+                  alias: Producer
+                  basisPoints: 6000
+                - address: GBG234UA6RBPDD5K6FHMQXHUXB5ALOENQGH24Y3W4ERX2YJNQ4MK4V25
+                  alias: Vocalist
+                  basisPoints: 4000
+      responses:
+        "200":
+          description: Unsigned transaction XDR ready for the owner to sign and submit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+              example:
+                xdr: AAAAAgAAAAC5tRUXpDqRcTvpvKF...(truncated unsigned transaction envelope)
+                metadata:
+                  contractId: CAGR5U5IBEPFVJDZPZUXXNCPXAHNZ6TWVIUTI5RLRH3SZSU4O2VXDOPF
+                  networkPassphrase: Test SDF Network ; September 2015
+                  sourceAccount: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+                  operation: create_project
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: VALIDATION_ERROR
+                message: collaborators basisPoints must sum to exactly 10000
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+                details:
+                  path:
+                    - collaborators
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}:
+    get:
+      summary: Get project details by ID
+      description: Fetches the current on-chain state for a single split project
+        including collaborators and balances.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+          required: true
+          name: projectId
+          in: path
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/lock:
+    post:
+      summary: Lock a project permanently
+      description: Builds an unsigned XDR to permanently lock a project, preventing
+        further metadata or collaborator changes.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+          required: true
+          name: projectId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owner:
+                  type: string
+                  minLength: 1
+                  description: owner
+              required:
+                - owner
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/deposit:
+    post:
+      summary: Deposit funds into a project
+      description: Builds an unsigned XDR to deposit tokens into a split project's
+        escrow balance.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+            example: afrobeats_001
+            description: Project ID
+          required: true
+          description: Project ID
+          name: projectId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from:
+                  type: string
+                  minLength: 1
+                  description: from
+                amount:
+                  type: number
+                  minimum: 0
+                  exclusiveMinimum: true
+                  description: deposit amount in stroops
+              required:
+                - from
+                - amount
+            example:
+              from: GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV
+              amount: 50000000
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+              example:
+                xdr: AAAAAgAAAAC5tRUXpDqRcTvpvKF...(truncated unsigned transaction envelope)
+                metadata:
+                  contractId: CAGR5U5IBEPFVJDZPZUXXNCPXAHNZ6TWVIUTI5RLRH3SZSU4O2VXDOPF
+                  networkPassphrase: Test SDF Network ; September 2015
+                  sourceAccount: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+                  operation: deposit
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: VALIDATION_ERROR
+                message: amount must be greater than 0
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+                details:
+                  path:
+                    - amount
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/metadata:
+    patch:
+      summary: Update project metadata (title/category)
+      description: Builds an unsigned XDR to update a project's title and project
+        type. Text fields are server-side sanitized.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+          required: true
+          name: projectId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owner:
+                  type: string
+                  minLength: 1
+                  description: owner
+                title:
+                  type: string
+                projectType:
+                  type: string
+              required:
+                - owner
+                - title
+                - projectType
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/collaborators:
+    put:
+      summary: Update project collaborators
+      description: Builds an unsigned XDR to replace the collaborator list and revenue
+        share allocations. Fails validation if any address repeats or shares
+        don't sum to 10,000 basis points; the frontend CreateSplitWizard
+        performs the same duplicate/casing checks client-side, but this endpoint
+        is the source of truth.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+            example: afrobeats_001
+            description: Project ID
+          required: true
+          description: Project ID
+          name: projectId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                owner:
+                  type: string
+                  minLength: 1
+                  description: owner
+                collaborators:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      address:
+                        type: string
+                        minLength: 1
+                      alias:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      basisPoints:
+                        type: integer
+                        minimum: 0
+                        exclusiveMinimum: true
+                        maximum: 10000
+                    required:
+                      - address
+                      - alias
+                      - basisPoints
+                  minItems: 2
+              required:
+                - owner
+                - collaborators
+            example:
+              owner: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+              collaborators:
+                - address: GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV
+                  alias: Producer
+                  basisPoints: 5000
+                - address: GBG234UA6RBPDD5K6FHMQXHUXB5ALOENQGH24Y3W4ERX2YJNQ4MK4V25
+                  alias: Vocalist
+                  basisPoints: 5000
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+              example:
+                xdr: AAAAAgAAAAC5tRUXpDqRcTvpvKF...(truncated unsigned transaction envelope)
+                metadata:
+                  contractId: CAGR5U5IBEPFVJDZPZUXXNCPXAHNZ6TWVIUTI5RLRH3SZSU4O2VXDOPF
+                  networkPassphrase: Test SDF Network ; September 2015
+                  sourceAccount: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+                  operation: update_collaborators
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: VALIDATION_ERROR
+                message: duplicate collaborator address found
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+                details:
+                  path:
+                    - collaborators
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/distribute:
+    post:
+      summary: Distribute project funds to collaborators
+      description: Builds an unsigned XDR to distribute accumulated project funds
+        according to collaborator shares.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+            example: afrobeats_001
+            description: Project ID
+          required: true
+          description: Project ID
+          name: projectId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourceAddress:
+                  type: string
+                  minLength: 1
+            example:
+              sourceAddress: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+              example:
+                xdr: AAAAAgAAAAC5tRUXpDqRcTvpvKF...(truncated unsigned transaction envelope)
+                metadata:
+                  contractId: CAGR5U5IBEPFVJDZPZUXXNCPXAHNZ6TWVIUTI5RLRH3SZSU4O2VXDOPF
+                  networkPassphrase: Test SDF Network ; September 2015
+                  sourceAccount: GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT
+                  operation: distribute
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: VALIDATION_ERROR
+                message: Invalid projectId format.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+                details:
+                  path:
+                    - projectId
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/claimable/{collaborator}:
+    get:
+      summary: Get claimable payout information for a collaborator
+      description: Returns the claimable, claimed, and total allocated amounts for a
+        collaborator on a project.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+          required: true
+          name: projectId
+          in: path
+        - schema:
+            type: string
+            minLength: 1
+            description: Stellar address of the collaborator
+          required: true
+          description: Stellar address of the collaborator
+          name: collaborator
+          in: path
+      responses:
+        "200":
+          description: Claimable payout information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimableResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/claim:
+    post:
+      summary: Claim collaborator payout
+      description: Builds an unsigned XDR allowing a collaborator to claim their
+        allocated share from a project.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+          required: true
+          name: projectId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                claimer:
+                  type: string
+                  minLength: 1
+                  description: collaborator address performing the claim
+              required:
+                - claimer
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/{projectId}/history:
+    get:
+      summary: Get project transaction history
+      description: Returns paginated on-chain distribution (`round`) and payout
+        (`payment`) events for a project, newest first. Pass the previous
+        response's `nextCursor` back as the `cursor` query parameter to page
+        forward.
+      tags:
+        - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: ^[a-zA-Z0-9_]+$
+            example: afrobeats_001
+            description: Project ID
+          required: true
+          description: Project ID
+          name: projectId
+          in: path
+        - schema:
+            type: string
+            default: ""
+          required: false
+          name: cursor
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+          required: false
+          name: limit
+          in: query
+      responses:
+        "200":
+          description: History items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      nullable: true
+                  nextCursor:
+                    type: string
+                    nullable: true
+                required:
+                  - items
+                  - nextCursor
+              example:
+                items:
+                  - type: payment
+                    recipient: GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV
+                    amount: "3000000"
+                    txHash: 3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc
+                    ledgerCloseTime: "1732012800"
+                    id: 0000012345678901234-0000000001
+                  - type: round
+                    round: 3
+                    amount: "5000000"
+                    txHash: 3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc
+                    ledgerCloseTime: "1732012700"
+                    id: 0000012345678901233-0000000001
+                nextCursor: 0000012345678901233-0000000001
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: VALIDATION_ERROR
+                message: Invalid query parameters.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+                details:
+                  message: Check cursor and limit parameters.
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /events:
+    get:
+      summary: Observe transaction status updates for a submitted XDR (SSE)
+      description: |-
+        Opens a Server-Sent Events stream and emits a `transaction_update` event each time the backend observes an update for the given `txHash`. Limited to 5 concurrent subscribers per `txHash` (configurable via `SSE_MAX_LISTENERS_PER_TXHASH`); exceeding it returns 429.
+
+        Example frame:
+        ```
+        event: transaction_update
+        data: {"txHash":"3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc","status":"pending"}
+
+        ```
+      tags:
+        - Events
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            example: 3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc
+            description: Transaction hash to observe
+          required: true
+          description: Transaction hash to observe
+          name: txHash
+          in: query
+      responses:
+        "200":
+          description: text/event-stream of `transaction_update` frames (connection stays
+            open)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |+
+                  event: transaction_update
+                  data: {"txHash":"3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc","status":"pending"}
+
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Too many concurrent subscribers for this txHash
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: too_many_event_listeners
+                code: RESOURCE_LIMIT_EXCEEDED
+                message: Too many event stream subscribers for this transaction.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+                details:
+                  txHash: 3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc
+                  limit: 5
+  /events/transactions/{txHash}:
+    get:
+      summary: Observe a single transaction until it's confirmed (SSE)
+      description: |-
+        Opens a Server-Sent Events stream and emits one `transaction:confirmed` event with the full transaction record once `EventListenerService` observes it on-chain. Sends a `: heartbeat` comment every 15s to keep intermediary proxies from closing the connection.
+
+        Example frame:
+        ```
+        event: transaction:confirmed
+        data: {"txHash":"3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc","roundId":"afrobeats_001","recipient":"GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV","amount":"1000","token":"native","timestamp":1732012800,"status":"completed"}
+
+        ```
+      tags:
+        - Events
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            example: 3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc
+          required: true
+          name: txHash
+          in: path
+      responses:
+        "200":
+          description: text/event-stream of a single `transaction:confirmed` frame
+            (connection stays open until then)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |+
+                  event: transaction:confirmed
+                  data: {"txHash":"3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc","roundId":"afrobeats_001","recipient":"GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV","amount":"1000","token":"native","timestamp":1732012800,"status":"completed"}
+
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/allowlist:
+    get:
+      summary: List allowed payment tokens
+      description: Returns the contract admin address, total allowed token count, and
+        a paginated token allowlist.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      parameters:
+        - schema:
+            type: integer
+            nullable: true
+            minimum: 0
+            default: 0
+          required: false
+          name: start
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+          required: false
+          name: limit
+          in: query
+      responses:
+        "200":
+          description: Token allowlist page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  admin:
+                    type: string
+                    nullable: true
+                  count:
+                    type: integer
+                  tokens:
+                    type: array
+                    items:
+                      type: string
+                required:
+                  - admin
+                  - count
+                  - tokens
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/allow-token:
+    post:
+      summary: Allow a payment token
+      description: Builds an unsigned XDR to add a token to the contract allowlist.
+        Requires admin API key.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin:
+                  type: string
+                  minLength: 1
+                  description: admin
+                token:
+                  type: string
+                  minLength: 1
+                  description: token
+              required:
+                - admin
+                - token
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/disallow-token:
+    post:
+      summary: Disallow a payment token
+      description: Builds an unsigned XDR to remove a token from the contract
+        allowlist. Requires admin API key.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin:
+                  type: string
+                  minLength: 1
+                  description: admin
+                token:
+                  type: string
+                  minLength: 1
+                  description: token
+              required:
+                - admin
+                - token
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/pause-distributions:
+    post:
+      summary: Pause all distributions
+      description: Builds an unsigned XDR to pause contract-wide fund distributions.
+        Requires admin API key.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin:
+                  type: string
+                  minLength: 1
+                  description: admin
+              required:
+                - admin
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/unpause-distributions:
+    post:
+      summary: Unpause distributions
+      description: Builds an unsigned XDR to resume contract-wide fund distributions.
+        Requires admin API key.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin:
+                  type: string
+                  minLength: 1
+                  description: admin
+              required:
+                - admin
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/status:
+    get:
+      summary: Get admin contract status
+      description: Returns the current contract admin address and whether
+        distributions are paused.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      responses:
+        "200":
+          description: Admin status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStatus"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/is-token-allowed:
+    get:
+      summary: Check if a token is allowed
+      description: Returns whether a specific token contract address is on the allowlist.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            description: token contract address to check
+          required: true
+          description: token contract address to check
+          name: token
+          in: query
+      responses:
+        "200":
+          description: Token allowlist check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  isAllowed:
+                    type: boolean
+                required:
+                  - token
+                  - isAllowed
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/token-count:
+    get:
+      summary: Get allowed token count
+      description: Returns the total number of tokens on the contract allowlist.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      responses:
+        "200":
+          description: Allowed token count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                required:
+                  - count
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/unallocated:
+    get:
+      summary: Get unallocated token balance
+      description: Returns the unallocated balance held by the contract for a given token.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            description: token contract address
+          required: true
+          description: token contract address
+          name: token
+          in: query
+      responses:
+        "200":
+          description: Unallocated balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  unallocated:
+                    type: string
+                required:
+                  - token
+                  - unallocated
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/withdraw-unallocated:
+    post:
+      summary: Withdraw unallocated tokens
+      description: Builds an unsigned XDR to recover unallocated token balance from
+        the contract. Requires admin API key.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                admin:
+                  type: string
+                  minLength: 1
+                  description: admin
+                token:
+                  type: string
+                  minLength: 1
+                  description: token contract address
+                to:
+                  type: string
+                  minLength: 1
+                  description: destination address
+                amount:
+                  type: number
+                  minimum: 0
+                  exclusiveMinimum: true
+                  description: amount in stroops to recover
+              required:
+                - admin
+                - token
+                - to
+                - amount
+      responses:
+        "200":
+          description: Unsigned transaction XDR
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/XdrResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "502":
+          description: Upstream RPC or contract error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /splits/admin/cache-stats:
+    get:
+      summary: Get read cache statistics
+      description: Returns internal read-cache hit/miss statistics for diagnostics.
+      tags:
+        - Admin
+      security:
+        - adminApiKey: []
+      responses:
+        "200":
+          description: Cache statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hits:
+                    type: integer
+                  misses:
+                    type: integer
+                  evictions:
+                    type: integer
+                  ttlMs:
+                    type: integer
+                required:
+                  - hits
+                  - misses
+                  - evictions
+                  - ttlMs
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/register:
+    post:
+      summary: Register a new user
+      description: Creates a user profile linked to a Stellar wallet address.
+      tags:
+        - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                walletAddress:
+                  type: string
+                  minLength: 1
+                email:
+                  type: string
+                  format: email
+                alias:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+              required:
+                - walletAddress
+      responses:
+        "201":
+          description: Registered user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  walletAddress:
+                    type: string
+                  email:
+                    type: string
+                  alias:
+                    type: string
+                  role:
+                    type: string
+                  isActive:
+                    type: boolean
+                  createdAt:
+                    type: string
+                  updatedAt:
+                    type: string
+                required:
+                  - id
+                  - walletAddress
+                  - role
+                  - isActive
+                  - createdAt
+                  - updatedAt
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Conflict with existing resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/login:
+    post:
+      summary: Log in by wallet address
+      description: Authenticates a registered user and returns a JWT bearer token.
+      tags:
+        - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                walletAddress:
+                  type: string
+                  minLength: 1
+              required:
+                - walletAddress
+      responses:
+        "200":
+          description: Authenticated user with JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  walletAddress:
+                    type: string
+                  email:
+                    type: string
+                  alias:
+                    type: string
+                  role:
+                    type: string
+                  isActive:
+                    type: boolean
+                  createdAt:
+                    type: string
+                  updatedAt:
+                    type: string
+                  token:
+                    type: string
+                required:
+                  - id
+                  - walletAddress
+                  - role
+                  - isActive
+                  - createdAt
+                  - updatedAt
+                  - token
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/me:
+    get:
+      summary: Get authenticated user profile
+      description: Returns the profile of the user identified by the JWT bearer token.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Authenticated user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  walletAddress:
+                    type: string
+                  email:
+                    type: string
+                  alias:
+                    type: string
+                  role:
+                    type: string
+                  isActive:
+                    type: boolean
+                  createdAt:
+                    type: string
+                  updatedAt:
+                    type: string
+                required:
+                  - id
+                  - walletAddress
+                  - role
+                  - isActive
+                  - createdAt
+                  - updatedAt
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      summary: Update authenticated user profile
+      description: Updates email or alias for the authenticated user.
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                alias:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+      responses:
+        "200":
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  walletAddress:
+                    type: string
+                  email:
+                    type: string
+                  alias:
+                    type: string
+                  role:
+                    type: string
+                  isActive:
+                    type: boolean
+                  createdAt:
+                    type: string
+                  updatedAt:
+                    type: string
+                required:
+                  - id
+                  - walletAddress
+                  - role
+                  - isActive
+                  - createdAt
+                  - updatedAt
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: UNAUTHORIZED
+                message: Missing or invalid bearer token / admin API key.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/{walletAddress}:
+    get:
+      summary: Get user by wallet address
+      description: Looks up a public user profile by Stellar wallet address.
+      tags:
+        - Users
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: true
+          name: walletAddress
+          in: path
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  walletAddress:
+                    type: string
+                  email:
+                    type: string
+                  alias:
+                    type: string
+                  role:
+                    type: string
+                  isActive:
+                    type: boolean
+                  createdAt:
+                    type: string
+                  updatedAt:
+                    type: string
+                required:
+                  - id
+                  - walletAddress
+                  - role
+                  - isActive
+                  - createdAt
+                  - updatedAt
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /transactions/history:
+    get:
+      summary: Query payout transaction history
+      description: Returns paginated payout records with optional wallet, date, and
+        status filters.
+      tags:
+        - Transactions
+      parameters:
+        - schema:
+            type: string
+            pattern: ^G[A-Z2-7]{55}$
+          required: false
+          name: walletAddress
+          in: query
+        - schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+          required: false
+          name: startDate
+          in: query
+        - schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+          required: false
+          name: endDate
+          in: query
+        - schema:
+            type: string
+            enum:
+              - pending
+              - completed
+              - failed
+          required: false
+          name: status
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          required: false
+          name: limit
+          in: query
+        - schema:
+            type: integer
+            nullable: true
+            minimum: 0
+            default: 0
+          required: false
+          name: offset
+          in: query
+      responses:
+        "200":
+          description: Paginated transaction history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        roundId:
+                          type: string
+                        recipient:
+                          type: string
+                        amount:
+                          type: string
+                        token:
+                          type: string
+                        timestamp:
+                          type: integer
+                        txHash:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                            - pending
+                            - completed
+                            - failed
+                      required:
+                        - id
+                        - roundId
+                        - recipient
+                        - amount
+                        - token
+                        - timestamp
+                        - txHash
+                        - status
+                  total:
+                    type: integer
+                    minimum: 0
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                required:
+                  - transactions
+                  - total
+                  - limit
+                  - offset
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /transactions/{txHash}:
+    get:
+      summary: Get transaction by hash
+      description: Returns a single payout record matching the Stellar transaction hash.
+      tags:
+        - Transactions
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: true
+          name: txHash
+          in: path
+      responses:
+        "200":
+          description: Transaction record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  roundId:
+                    type: string
+                  recipient:
+                    type: string
+                  amount:
+                    type: string
+                  token:
+                    type: string
+                  timestamp:
+                    type: integer
+                  txHash:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - pending
+                      - completed
+                      - failed
+                required:
+                  - id
+                  - roundId
+                  - recipient
+                  - amount
+                  - token
+                  - timestamp
+                  - txHash
+                  - status
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: NOT_FOUND
+                message: Project afrobeats_001 does not exist.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /transactions/recipient/{walletAddress}:
+    get:
+      summary: List transactions for a recipient
+      description: Returns all payout records sent to the given Stellar wallet address.
+      tags:
+        - Transactions
+      parameters:
+        - schema:
+            type: string
+            pattern: ^G[A-Z2-7]{55}$
+          required: true
+          name: walletAddress
+          in: path
+      responses:
+        "200":
+          description: Recipient transaction list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        roundId:
+                          type: string
+                        recipient:
+                          type: string
+                        amount:
+                          type: string
+                        token:
+                          type: string
+                        timestamp:
+                          type: integer
+                        txHash:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                            - pending
+                            - completed
+                            - failed
+                      required:
+                        - id
+                        - roundId
+                        - recipient
+                        - amount
+                        - token
+                        - timestamp
+                        - txHash
+                        - status
+                  total:
+                    type: integer
+                  walletAddress:
+                    type: string
+                required:
+                  - transactions
+                  - total
+                  - walletAddress
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /health:
+    get:
+      summary: Get readiness status (alias for /health/ready)
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Server is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: Server is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+  /health/live:
+    get:
+      summary: Liveness check (Kubernetes compatible)
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                required:
+                  - status
+  /health/ready:
+    get:
+      summary: Readiness check (Kubernetes compatible)
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Server is ready to accept traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ready
+                required:
+                  - status
+        "503":
+          description: Server is not ready (missing configuration)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+  /ops/mainnet-readiness:
+    get:
+      summary: Mainnet readiness validation for deployment and ops workflows
+      tags:
+        - Operations
+      responses:
+        "200":
+          description: Mainnet readiness validation passed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MainnetReadinessResponse"
+        "503":
+          description: Mainnet readiness validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MainnetReadinessResponse"
+  /:
+    get:
+      summary: Get API information
+      tags:
+        - System
+      responses:
+        "200":
+          description: API metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  status:
+                    type: string
+                  version:
+                    type: string
+                required:
+                  - name
+                  - status
+                  - version

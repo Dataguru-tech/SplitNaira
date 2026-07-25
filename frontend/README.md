@@ -8,6 +8,7 @@ Next.js app scaffold for the SplitNaira web experience.
 - `npm run build`
 - `npm run start`
 - `npm run test`
+- `npm run check:i18n` - fails if any locale's message keys don't match `en.json`
 
 ## Notes
 - Dependencies are pinned to exact versions in `package.json` and `package-lock.json`.
@@ -16,6 +17,17 @@ Next.js app scaffold for the SplitNaira web experience.
 - Configure `NEXT_PUBLIC_*` variables in `.env.local` based on `.env.example`.
 - i18n is powered by `next-intl`; locale-prefixed routes are enabled (e.g. `/en`, `/fr`).
 - To add another language, update `src/i18n/routing.ts` and add a matching `messages/<locale>.json`.
+
+### Adding a translation key
+1. Add the key to `messages/en.json` (the base locale) wherever it belongs in the nested structure.
+2. Add the same key, translated, to every other locale file (currently `messages/fr.json`).
+3. Run `npm run check:i18n` — it fails on any key that's missing from, or extra in, a non-base locale
+   relative to `en.json`. CI runs this on every PR (`ci.yml`, `frontend-ci.yml`, `frontend-quality.yml`).
+4. If a key is intentionally locale-specific (rare), add it to `messages/i18n-ignore.json` under
+   `ignoreMissingKeys.<locale>` or `ignoreExtraKeys.<locale>` instead of leaving locales out of sync:
+   ```json
+   { "ignoreMissingKeys": { "fr": ["SplitApp.experimentalFeature"] } }
+   ```
 
 ## Structure
 - `src/app` - App Router pages and layout

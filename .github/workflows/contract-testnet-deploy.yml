@@ -9,8 +9,10 @@ on:
       - ".github/workflows/contract-testnet-deploy.yml"
   workflow_dispatch:
 
+# Read-only default; the deploy-testnet job elevates to contents: write
+# because it commits the redeployed contract id back to the repo.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: contract-testnet-deploy
@@ -20,6 +22,10 @@ jobs:
   deploy-testnet:
     runs-on: ubuntu-latest
     if: github.actor != 'github-actions[bot]'
+    # Exception: needs to commit + push contracts/deployments.json and the
+    # generated contract config files after a successful testnet deploy.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
