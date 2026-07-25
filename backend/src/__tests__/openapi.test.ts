@@ -1,6 +1,13 @@
+import { readFileSync } from "fs";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { describe, it, expect } from "vitest";
 import SwaggerParser from "@apidevtools/swagger-parser";
+import * as yaml from "yaml";
 import { generateOpenApi } from "../openapi.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const committedSpecPath = join(__dirname, "..", "..", "..", "docs", "openapi.yaml");
 
 describe("OpenAPI specification", () => {
   it("generates a valid OpenAPI document without $ref errors", async () => {
@@ -16,5 +23,11 @@ describe("OpenAPI specification", () => {
     }
 
     await expect(SwaggerParser.validate(spec)).resolves.toBeDefined();
+  });
+
+  it("matches the committed docs/openapi.yaml (run `cd backend && npm run generate:openapi` if this fails)", () => {
+    const generated = yaml.stringify(generateOpenApi());
+    const committed = readFileSync(committedSpecPath, "utf8");
+    expect(generated).toBe(committed);
   });
 });

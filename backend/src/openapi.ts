@@ -43,22 +43,72 @@ import {
 
 const registry = new OpenAPIRegistry();
 
+// ─── Example fixtures ──────────────────────────────────────────────────────────
+//
+// Realistic (but non-custodial) Stellar addresses used across request/response
+// examples below. Keep the shapes here aligned with the fixtures used in
+// backend/src/__tests__/e2e-happy-path.test.ts and events*.test.ts so the docs
+// don't drift from what the test suite actually exercises.
+
+const EXAMPLE_OWNER = "GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT";
+const EXAMPLE_COLLAB_A = "GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV";
+const EXAMPLE_COLLAB_B = "GBG234UA6RBPDD5K6FHMQXHUXB5ALOENQGH24Y3W4ERX2YJNQ4MK4V25";
+const EXAMPLE_ADMIN = "GCJIQR7K2ZNIBXKFYHC6YMGD7CX46X3LAUBZAMQSMFB3XPHDY6YAT5GC";
+const EXAMPLE_TOKEN = "CDOVDY3MZDG7PHCGVP7EP2EKQ2ENV26DZW6FKLBRN42LOGIZGXZV3WX5";
+const EXAMPLE_CONTRACT_ID = "CAGR5U5IBEPFVJDZPZUXXNCPXAHNZ6TWVIUTI5RLRH3SZSU4O2VXDOPF";
+const EXAMPLE_PROJECT_ID = "afrobeats_001";
+const EXAMPLE_TX_HASH = "3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8fc";
+const EXAMPLE_REQUEST_ID = "b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d";
+
+// Mirrors projectIdParamSchema's constraints (see schemas/splits.ts). Built
+// locally rather than calling `.openapi()` on the imported schema directly:
+// ESM hoists that import ahead of the `extendZodWithOpenApi(z)` call above,
+// so the imported instance never picks up the `.openapi()` prototype method.
+const exampleProjectIdParam = z
+  .string()
+  .min(1)
+  .max(32)
+  .regex(/^[a-zA-Z0-9_]+$/)
+  .openapi({ example: EXAMPLE_PROJECT_ID, description: "Project ID" });
+
+function xdrExample(operation: string) {
+  return {
+    xdr: "AAAAAgAAAAC5tRUXpDqRcTvpvKF...(truncated unsigned transaction envelope)",
+    metadata: {
+      contractId: EXAMPLE_CONTRACT_ID,
+      networkPassphrase: "Test SDF Network ; September 2015",
+      sourceAccount: EXAMPLE_OWNER,
+      operation,
+    },
+  };
+}
+
 const ApiErrorSchema = registry.register(
   "ApiError",
-  z.object({
-    error: z.string().describe("Machine-readable error code"),
-    message: z.string().optional().describe("Human-readable error message"),
-    requestId: z.string().optional().describe("Request correlation ID"),
-    details: z.record(z.string(), z.unknown()).optional().describe("Additional error context"),
-  })
+  z
+    .object({
+      error: z.string().describe("Machine-readable error code"),
+      message: z.string().optional().describe("Human-readable error message"),
+      requestId: z.string().optional().describe("Request correlation ID"),
+      details: z.record(z.string(), z.unknown()).optional().describe("Additional error context"),
+    })
+    .openapi({
+      example: {
+        error: "VALIDATION_ERROR",
+        message: "collaborators basisPoints must sum to exactly 10000",
+        requestId: EXAMPLE_REQUEST_ID,
+        details: { path: ["collaborators"] },
+      },
+    })
 );
 
-function apiErrorResponse(description: string) {
+function apiErrorResponse(description: string, example?: Record<string, unknown>) {
   return {
     description,
     content: {
       "application/json": {
         schema: ApiErrorSchema,
+        ...(example ? { example } : {}),
       },
     },
   };
@@ -66,6 +116,7 @@ function apiErrorResponse(description: string) {
 
 function standardErrorResponses(options: {
   badRequest?: boolean;
+  badRequestExample?: Record<string, unknown>;
   unauthorized?: boolean;
   notFound?: boolean;
   conflict?: boolean;
@@ -74,9 +125,23 @@ function standardErrorResponses(options: {
   unavailable?: boolean;
 } = {}) {
   const responses: Record<number, ReturnType<typeof apiErrorResponse>> = {};
-  if (options.badRequest) responses[400] = apiErrorResponse("Validation error");
-  if (options.unauthorized) responses[401] = apiErrorResponse("Authentication required");
-  if (options.notFound) responses[404] = apiErrorResponse("Resource not found");
+  if (options.badRequest) {
+    responses[400] = apiErrorResponse("Validation error", options.badRequestExample);
+  }
+  if (options.unauthorized) {
+    responses[401] = apiErrorResponse("Authentication required", {
+      error: "UNAUTHORIZED",
+      message: "Missing or invalid bearer token / admin API key.",
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
+  if (options.notFound) {
+    responses[404] = apiErrorResponse("Resource not found", {
+      error: "NOT_FOUND",
+      message: `Project ${EXAMPLE_PROJECT_ID} does not exist.`,
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
   if (options.conflict) responses[409] = apiErrorResponse("Conflict with existing resource");
   if (options.serverError) responses[500] = apiErrorResponse("Internal server error");
   if (options.badGateway) responses[502] = apiErrorResponse("Upstream RPC or contract error");
@@ -155,27 +220,52 @@ registry.registerPath({
   method: "post",
   path: "/splits",
   summary: "Create a new split project",
-  description: "Builds an unsigned Soroban transaction XDR to create a new revenue-split project on-chain.",
+  description:
+    "Builds an unsigned Soroban transaction XDR to create a new revenue-split project on-chain. " +
+    "The caller must sign the returned XDR with the `owner` wallet and submit it themselves; " +
+    "this endpoint never holds a private key.",
   tags: ["Splits"],
   request: {
     body: {
       content: {
         "application/json": {
           schema: createSplitSchema,
+          example: {
+            owner: EXAMPLE_OWNER,
+            projectId: EXAMPLE_PROJECT_ID,
+            title: "Afrobeats Collective Vol. 1",
+            projectType: "music",
+            token: EXAMPLE_TOKEN,
+            collaborators: [
+              { address: EXAMPLE_COLLAB_A, alias: "Producer", basisPoints: 6000 },
+              { address: EXAMPLE_COLLAB_B, alias: "Vocalist", basisPoints: 4000 },
+            ],
+          },
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Unsigned transaction XDR",
+      description: "Unsigned transaction XDR ready for the owner to sign and submit",
       content: {
         "application/json": {
           schema: XdrResponseSchema,
+          example: xdrExample("create_project"),
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({
+      badRequest: true,
+      badGateway: true,
+      serverError: true,
+      badRequestExample: {
+        error: "VALIDATION_ERROR",
+        message: "collaborators basisPoints must sum to exactly 10000",
+        requestId: EXAMPLE_REQUEST_ID,
+        details: { path: ["collaborators"] },
+      },
+    }),
   },
 });
 
@@ -237,11 +327,15 @@ registry.registerPath({
   description: "Builds an unsigned XDR to deposit tokens into a split project's escrow balance.",
   tags: ["Splits"],
   request: {
-    params: z.object({ projectId: projectIdParamSchema }),
+    params: z.object({ projectId: exampleProjectIdParam }),
     body: {
       content: {
         "application/json": {
           schema: depositSchema,
+          example: {
+            from: EXAMPLE_COLLAB_A,
+            amount: 50_000_000,
+          },
         },
       },
     },
@@ -252,10 +346,22 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: XdrResponseSchema,
+          example: xdrExample("deposit"),
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, notFound: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({
+      badRequest: true,
+      notFound: true,
+      badGateway: true,
+      serverError: true,
+      badRequestExample: {
+        error: "VALIDATION_ERROR",
+        message: "amount must be greater than 0",
+        requestId: EXAMPLE_REQUEST_ID,
+        details: { path: ["amount"] },
+      },
+    }),
   },
 });
 
@@ -292,14 +398,25 @@ registry.registerPath({
   method: "put",
   path: "/splits/{projectId}/collaborators",
   summary: "Update project collaborators",
-  description: "Builds an unsigned XDR to replace the collaborator list and revenue share allocations.",
+  description:
+    "Builds an unsigned XDR to replace the collaborator list and revenue share allocations. " +
+    "Fails validation if any address repeats or shares don't sum to 10,000 basis points; " +
+    "the frontend CreateSplitWizard performs the same duplicate/casing checks client-side, " +
+    "but this endpoint is the source of truth.",
   tags: ["Splits"],
   request: {
-    params: z.object({ projectId: projectIdParamSchema }),
+    params: z.object({ projectId: exampleProjectIdParam }),
     body: {
       content: {
         "application/json": {
           schema: updateCollaboratorsSchema,
+          example: {
+            owner: EXAMPLE_OWNER,
+            collaborators: [
+              { address: EXAMPLE_COLLAB_A, alias: "Producer", basisPoints: 5000 },
+              { address: EXAMPLE_COLLAB_B, alias: "Vocalist", basisPoints: 5000 },
+            ],
+          },
         },
       },
     },
@@ -310,10 +427,22 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: XdrResponseSchema,
+          example: xdrExample("update_collaborators"),
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, notFound: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({
+      badRequest: true,
+      notFound: true,
+      badGateway: true,
+      serverError: true,
+      badRequestExample: {
+        error: "VALIDATION_ERROR",
+        message: "duplicate collaborator address found",
+        requestId: EXAMPLE_REQUEST_ID,
+        details: { path: ["collaborators"] },
+      },
+    }),
   },
 });
 
@@ -324,11 +453,14 @@ registry.registerPath({
   description: "Builds an unsigned XDR to distribute accumulated project funds according to collaborator shares.",
   tags: ["Splits"],
   request: {
-    params: z.object({ projectId: projectIdParamSchema }),
+    params: z.object({ projectId: exampleProjectIdParam }),
     body: {
       content: {
         "application/json": {
           schema: distributeSchema,
+          example: {
+            sourceAddress: EXAMPLE_OWNER,
+          },
         },
       },
     },
@@ -339,10 +471,22 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: XdrResponseSchema,
+          example: xdrExample("distribute"),
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, notFound: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({
+      badRequest: true,
+      notFound: true,
+      badGateway: true,
+      serverError: true,
+      badRequestExample: {
+        error: "VALIDATION_ERROR",
+        message: "Invalid projectId format.",
+        requestId: EXAMPLE_REQUEST_ID,
+        details: { path: ["projectId"] },
+      },
+    }),
   },
 });
 
@@ -415,10 +559,12 @@ registry.registerPath({
   method: "get",
   path: "/splits/{projectId}/history",
   summary: "Get project transaction history",
-  description: "Returns paginated on-chain distribution and payment events for a project.",
+  description:
+    "Returns paginated on-chain distribution (`round`) and payout (`payment`) events for a project, " +
+    "newest first. Pass the previous response's `nextCursor` back as the `cursor` query parameter to page forward.",
   tags: ["Splits"],
   request: {
-    params: z.object({ projectId: projectIdParamSchema }),
+    params: z.object({ projectId: exampleProjectIdParam }),
     query: historyQuerySchema,
   },
   responses: {
@@ -430,10 +576,137 @@ registry.registerPath({
             items: z.array(z.any()),
             nextCursor: z.string().nullable(),
           }),
+          example: {
+            items: [
+              {
+                type: "payment",
+                recipient: EXAMPLE_COLLAB_A,
+                amount: "3000000",
+                txHash: EXAMPLE_TX_HASH,
+                ledgerCloseTime: "1732012800",
+                id: "0000012345678901234-0000000001",
+              },
+              {
+                type: "round",
+                round: 3,
+                amount: "5000000",
+                txHash: EXAMPLE_TX_HASH,
+                ledgerCloseTime: "1732012700",
+                id: "0000012345678901233-0000000001",
+              },
+            ],
+            nextCursor: "0000012345678901233-0000000001",
+          },
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, notFound: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({
+      badRequest: true,
+      notFound: true,
+      badGateway: true,
+      serverError: true,
+      badRequestExample: {
+        error: "VALIDATION_ERROR",
+        message: "Invalid query parameters.",
+        requestId: EXAMPLE_REQUEST_ID,
+        details: { message: "Check cursor and limit parameters." },
+      },
+    }),
+  },
+});
+
+// ─── Events (Server-Sent Events) ───────────────────────────────────────────────
+//
+// Both endpoints hold the HTTP response open and stream `text/event-stream`
+// frames; OpenAPI 3.0 has no native way to type individual named SSE events,
+// so the shape of each event's `data:` payload is documented in the
+// description and mirrored from backend/src/__tests__/events.test.ts and
+// events-transactions-sse.test.ts.
+
+registry.registerPath({
+  method: "get",
+  path: "/events",
+  summary: "Observe transaction status updates for a submitted XDR (SSE)",
+  description:
+    "Opens a Server-Sent Events stream and emits a `transaction_update` event each time the " +
+    "backend observes an update for the given `txHash`. Limited to 5 concurrent subscribers " +
+    "per `txHash` (configurable via `SSE_MAX_LISTENERS_PER_TXHASH`); exceeding it returns 429.\n\n" +
+    "Example frame:\n" +
+    "```\n" +
+    "event: transaction_update\n" +
+    `data: {"txHash":"${EXAMPLE_TX_HASH}","status":"pending"}\n` +
+    "\n" +
+    "```",
+  tags: ["Events"],
+  request: {
+    query: z.object({
+      txHash: z.string().min(1).openapi({ example: EXAMPLE_TX_HASH }).describe("Transaction hash to observe"),
+    }),
+  },
+  responses: {
+    200: {
+      description: "text/event-stream of `transaction_update` frames (connection stays open)",
+      content: {
+        "text/event-stream": {
+          schema: z.string().openapi({
+            example: `event: transaction_update\ndata: {"txHash":"${EXAMPLE_TX_HASH}","status":"pending"}\n\n`,
+          }),
+        },
+      },
+    },
+    429: {
+      description: "Too many concurrent subscribers for this txHash",
+      content: {
+        "application/json": {
+          schema: ApiErrorSchema,
+          example: {
+            error: "too_many_event_listeners",
+            code: "RESOURCE_LIMIT_EXCEEDED",
+            message: "Too many event stream subscribers for this transaction.",
+            requestId: EXAMPLE_REQUEST_ID,
+            details: { txHash: EXAMPLE_TX_HASH, limit: 5 },
+          },
+        },
+      },
+    },
+    ...standardErrorResponses({ badRequest: true }),
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/events/transactions/{txHash}",
+  summary: "Observe a single transaction until it's confirmed (SSE)",
+  description:
+    "Opens a Server-Sent Events stream and emits one `transaction:confirmed` event with the " +
+    "full transaction record once `EventListenerService` observes it on-chain. Sends a `: heartbeat` " +
+    "comment every 15s to keep intermediary proxies from closing the connection.\n\n" +
+    "Example frame:\n" +
+    "```\n" +
+    "event: transaction:confirmed\n" +
+    `data: {"txHash":"${EXAMPLE_TX_HASH}","roundId":"${EXAMPLE_PROJECT_ID}","recipient":"${EXAMPLE_COLLAB_A}","amount":"1000","token":"native","timestamp":1732012800,"status":"completed"}\n` +
+    "\n" +
+    "```",
+  tags: ["Events"],
+  request: {
+    params: z.object({
+      txHash: z.string().min(1).openapi({ example: EXAMPLE_TX_HASH }),
+    }),
+  },
+  responses: {
+    200: {
+      description: "text/event-stream of a single `transaction:confirmed` frame (connection stays open until then)",
+      content: {
+        "text/event-stream": {
+          schema: z.string().openapi({
+            example:
+              `event: transaction:confirmed\ndata: {"txHash":"${EXAMPLE_TX_HASH}","roundId":"${EXAMPLE_PROJECT_ID}",` +
+              `"recipient":"${EXAMPLE_COLLAB_A}","amount":"1000","token":"native","timestamp":1732012800,"status":"completed"}\n\n`,
+          }),
+        },
+      },
+    },
+    ...standardErrorResponses({ badRequest: true }),
   },
 });
 
@@ -453,6 +726,7 @@ registry.registerPath({
   summary: "List allowed payment tokens",
   description: "Returns the contract admin address, total allowed token count, and a paginated token allowlist.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: { query: allowlistQuerySchema },
   responses: {
     200: {
@@ -477,6 +751,7 @@ registry.registerPath({
   summary: "Allow a payment token",
   description: "Builds an unsigned XDR to add a token to the contract allowlist. Requires admin API key.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: {
     body: { content: { "application/json": { schema: adminTokenSchema } } },
   },
@@ -492,6 +767,7 @@ registry.registerPath({
   summary: "Disallow a payment token",
   description: "Builds an unsigned XDR to remove a token from the contract allowlist. Requires admin API key.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: {
     body: { content: { "application/json": { schema: adminTokenSchema } } },
   },
@@ -507,6 +783,7 @@ registry.registerPath({
   summary: "Pause all distributions",
   description: "Builds an unsigned XDR to pause contract-wide fund distributions. Requires admin API key.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: {
     body: { content: { "application/json": { schema: pauseDistributionsSchema } } },
   },
@@ -522,6 +799,7 @@ registry.registerPath({
   summary: "Unpause distributions",
   description: "Builds an unsigned XDR to resume contract-wide fund distributions. Requires admin API key.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: {
     body: { content: { "application/json": { schema: pauseDistributionsSchema } } },
   },
@@ -537,6 +815,7 @@ registry.registerPath({
   summary: "Get admin contract status",
   description: "Returns the current contract admin address and whether distributions are paused.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   responses: {
     200: {
       description: "Admin status",
@@ -552,6 +831,7 @@ registry.registerPath({
   summary: "Check if a token is allowed",
   description: "Returns whether a specific token contract address is on the allowlist.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: { query: isTokenAllowedQuerySchema },
   responses: {
     200: {
@@ -572,6 +852,7 @@ registry.registerPath({
   summary: "Get allowed token count",
   description: "Returns the total number of tokens on the contract allowlist.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   responses: {
     200: {
       description: "Allowed token count",
@@ -591,6 +872,7 @@ registry.registerPath({
   summary: "Get unallocated token balance",
   description: "Returns the unallocated balance held by the contract for a given token.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: { query: unallocatedQuerySchema },
   responses: {
     200: {
@@ -611,6 +893,7 @@ registry.registerPath({
   summary: "Withdraw unallocated tokens",
   description: "Builds an unsigned XDR to recover unallocated token balance from the contract. Requires admin API key.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   request: {
     body: { content: { "application/json": { schema: withdrawUnallocatedSchema } } },
   },
@@ -626,6 +909,7 @@ registry.registerPath({
   summary: "Get read cache statistics",
   description: "Returns internal read-cache hit/miss statistics for diagnostics.",
   tags: ["Admin"],
+  security: [{ adminApiKey: [] }],
   responses: {
     200: {
       description: "Cache statistics",
@@ -1039,7 +1323,7 @@ const isDirectRun = process.argv[1] && (
 
 if (isDirectRun) {
   const spec = generateOpenApi();
-  const docsDir = path.join(process.cwd(), "openapi");
+  const docsDir = path.join(path.dirname(__filename), "..", "..", "docs");
   if (!fs.existsSync(docsDir)) {
     fs.mkdirSync(docsDir, { recursive: true });
   }

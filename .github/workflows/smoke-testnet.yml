@@ -21,6 +21,11 @@ on:
         default: "false"
         type: boolean
 
+# Read-only: only checks out the repo and calls the live testnet contract
+# with a secret key; never pushes to the repo or GitHub API.
+permissions:
+  contents: read
+
 jobs:
   smoke-test:
     name: Smoke test on Testnet

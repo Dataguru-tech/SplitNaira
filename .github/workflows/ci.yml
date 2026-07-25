@@ -48,6 +48,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run check:i18n -w frontend
       - run: npm run lint -w frontend
       - run: npm run build -w frontend
       - run: npm run test -w frontend

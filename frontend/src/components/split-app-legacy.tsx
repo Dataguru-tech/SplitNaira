@@ -31,7 +31,7 @@ import {
   buildUnpauseDistributionsXdr,
   type AdminStatusState,
 } from "@/lib/api";
-import { isOwner } from "@/lib/address";
+import { isOwner, findDuplicateCollaboratorAddressIds, type CollaboratorAddressEntry } from "@/lib/address";
 import {
   createSorobanRpcServer,
   signWithWallet,
@@ -228,33 +228,26 @@ export function SplitApp({
 
   const collaboratorValidationErrors = useMemo(() => {
     const errors: Record<string, string> = {};
-    const addresses = new Map<string, string>();
-    const duplicates = new Set<string>();
+    const validEntries: CollaboratorAddressEntry[] = [];
 
     collaboratorFields.forEach((field, index) => {
       const collaborator = watchedCollaborators[index];
       if (!collaborator) return;
 
       const addr = collaborator.address.trim();
-      if (addr) {
-        if (!StrKey.isValidEd25519PublicKey(addr) && !StrKey.isValidContract(addr)) {
-          errors[field.id] = "Invalid Stellar address (G...) or contract ID (C...)";
-        } else if (addresses.has(addr)) {
-          duplicates.add(addr);
-        } else {
-          addresses.set(addr, field.id);
-        }
+      if (!addr) return;
+
+      if (!StrKey.isValidEd25519PublicKey(addr) && !StrKey.isValidContract(addr)) {
+        errors[field.id] = "Invalid Stellar address (G...) or contract ID (C...)";
+      } else {
+        validEntries.push({ id: field.id, address: addr });
       }
     });
 
-    if (duplicates.size > 0) {
-      collaboratorFields.forEach((field, index) => {
-        const addr = watchedCollaborators[index]?.address.trim();
-        if (addr && duplicates.has(addr)) {
-          errors[field.id] = "Duplicate address";
-        }
-      });
-    }
+    const duplicateIds = findDuplicateCollaboratorAddressIds(validEntries);
+    duplicateIds.forEach((id) => {
+      errors[id] = "Duplicate address";
+    });
 
     return errors;
   }, [collaboratorFields, watchedCollaborators]);
