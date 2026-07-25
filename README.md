@@ -265,6 +265,7 @@ npm run analyze
 - [Mainnet Launch Runbook](./docs/runbooks/mainnet-launch.md)
 - [User Onboarding Runbook](./docs/runbooks/user-onboarding.md)
 - [API Evolution Runbook](./docs/runbooks/api-evolution.md)
+- [Stuck Payouts Incident Response Runbook](./docs/runbooks/stuck-payouts.md)
 - [Changelog](./CHANGELOG.md)
 
 ## Release Versioning

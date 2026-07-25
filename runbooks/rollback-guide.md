@@ -36,3 +36,10 @@ Soroban contracts cannot be easily "deleted" after deployment, but they can be u
 1. **Immediate Halt**: If the contract is compromised, the `admin` account should invoke the `lock` or pause function to freeze state mutations.
 2. **Contract Upgrade**: Deploy a patched WASM binary and use the `upgrade` function (if implemented and authorized) to point the existing contract instance to the new logic.
 3. **Frontend Mitigation**: If the contract cannot be halted, immediately push a frontend patch disabling interactions with the compromised contract ID to protect end-users.
+
+## Related Runbooks
+
+- [Stuck Payouts Incident Response](../docs/runbooks/stuck-payouts.md) — Playbook for delayed payouts, stuck transactions, and RPC degradation
+- [Ops Deployment & Rollback](../docs/runbooks/ops-deployment-rollback.md) — Contract metadata sync and rollback paths
+- [CI/CD Incident Management](../docs/runbooks/incident-management.md) — CI/CD, deploy, and runtime incident triage
+
