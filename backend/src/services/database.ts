@@ -102,10 +102,6 @@ function isRetryableTransactionError(error: unknown): boolean {
   );
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export async function withTransaction<T>(
   callback: (queryRunner: QueryRunner) => Promise<T>
 ): Promise<T> {
