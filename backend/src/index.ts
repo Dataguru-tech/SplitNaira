@@ -13,6 +13,7 @@ import { docsRouter } from "./routes/docs.js";
 import { usersRouter } from "./routes/users.js";
 import { transactionsRouter } from "./routes/transactions.js";
 import { eventsRouter } from "./routes/events.js";
+import { ledgerRouter } from "./routes/ledger.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { metricsMiddleware } from "./middleware/metrics.js";
@@ -134,6 +135,7 @@ app.use("/users", (req, res, next) => {
   return writeLimiter(req, res, next);
 });
 app.use("/transactions", readLimiter);
+app.use("/api/ledger", readLimiter);
 app.use("/events", sseConnectionLimiter);
 
 app.get("/", (_req, res) => {
@@ -150,6 +152,7 @@ app.use("/docs", docsRouter);
 app.use("/users", usersRouter);
 app.use("/transactions", transactionsRouter);
 app.use("/events", eventsRouter);
+app.use("/api/ledger", ledgerRouter);
 
 app.get("/api/openapi.json", async (_req, res, next) => {
   try {
