@@ -9,6 +9,7 @@ export const healthRouter = Router();
 const SERVICE_VERSION = process.env.npm_package_version ?? "unknown";
 
 let startupComplete = false;
+let shuttingDown = false;
 
 /** Mark startup complete after DB and background services are initialised. */
 export function markStartupComplete(): void {
@@ -21,6 +22,24 @@ export function resetStartupComplete(): void {
 
 export function isStartupComplete(): boolean {
   return startupComplete;
+}
+
+/**
+ * Marks the service as shutting down so `/health/ready` starts failing
+ * immediately, before in-flight work (DB close, SSE drain, server.close)
+ * completes. Load balancers stop routing new traffic here without waiting
+ * for the process to actually exit.
+ */
+export function markShuttingDown(): void {
+  shuttingDown = true;
+}
+
+export function resetShuttingDown(): void {
+  shuttingDown = false;
+}
+
+export function isShuttingDown(): boolean {
+  return shuttingDown;
 }
 
 /**
@@ -62,6 +81,18 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
     rpc: { ok: false, message: "" },
     contract: { ok: false, message: "" }
   };
+
+  if (shuttingDown) {
+    res.status(503).json({
+      status: "not_ready",
+      error: "shutting_down",
+      message: "Service received a shutdown signal and is no longer accepting traffic.",
+      components,
+      requestId,
+      details: {}
+    });
+    return;
+  }
 
   if (!startupComplete) {
     res.status(503).json({

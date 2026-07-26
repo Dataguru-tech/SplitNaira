@@ -35,6 +35,22 @@ const MAX_LISTENERS_PER_TXHASH = Number.isNaN(parsedMaxListeners)
   : Math.max(1, parsedMaxListeners);
 const activeSubscriptions = new Map<string, Set<EventSubscription>>();
 
+// Tracks every open SSE response (both /events and /events/transactions/:txHash)
+// so a graceful shutdown can proactively end them instead of waiting on
+// server.close() to hang until each client disconnects on its own.
+const activeSseResponses = new Set<Response>();
+
+/** Ends every open SSE connection. Called from the SIGTERM/SIGINT handler. */
+export function closeAllSseConnections(): void {
+  for (const res of activeSseResponses) {
+    try {
+      res.end();
+    } catch (error) {
+      logger.warn("Failed to close SSE connection during shutdown", { error });
+    }
+  }
+}
+
 function getSubscriptionCount(txHash: string) {
   return activeSubscriptions.get(txHash)?.size ?? 0;
 }
@@ -99,10 +115,12 @@ async function handleEventStream(req: Request, res: Response) {
   };
 
   addSubscription(subscription);
+  activeSseResponses.add(res);
   eventBus.on(eventName, subscription.listener);
 
   res.on("close", () => {
     subscription.cleanup();
+    activeSseResponses.delete(res);
     logger.info("SSE client disconnected", { txHash, requestId });
   });
 
@@ -160,6 +178,7 @@ function handleTransactionStream(req: Request, res: Response) {
   };
 
   bus.on(TRANSACTION_CONFIRMED, listener);
+  activeSseResponses.add(res);
 
   const heartbeat = setInterval(() => {
     res.write(": heartbeat\n\n");
@@ -168,6 +187,7 @@ function handleTransactionStream(req: Request, res: Response) {
   req.on("close", () => {
     bus.removeListener(TRANSACTION_CONFIRMED, listener);
     clearInterval(heartbeat);
+    activeSseResponses.delete(res);
     logger.info("Transaction SSE client disconnected", { txHash, requestId });
   });
 
