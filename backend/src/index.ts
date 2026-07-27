@@ -33,6 +33,7 @@ import {
 } from "./middleware/payments-admin.js";
 import { auditAdminMutationsMiddleware } from "./middleware/audit-log.js";
 import { validateEnv, printEnvDiagnostics } from "./config/env.js";
+import { resolveCorsOrigins } from "./config/cors.js";
 import { initDatabase, closeDatabase } from "./services/database.js";
 import { logger } from "./services/logger.js";
 import {
@@ -46,19 +47,7 @@ export const app = express();
 
 app.disable("x-powered-by");
 
-const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean)
-  : ["http://localhost:3000"];
-
-if (process.env.NODE_ENV === "production" && corsOrigins.includes("*")) {
-  throw new Error(
-    "CORS wildcard (*) is not allowed in production. Set CORS_ORIGIN to specific origin(s)."
-  );
-}
-
-const corsOrigin = corsOrigins.length > 0 ? corsOrigins : false;
+const corsOrigin = resolveCorsOrigins(process.env);
 
 app.use(
   helmet({
@@ -81,7 +70,10 @@ app.use(
     noSniff: true,
   })
 );
-app.use(cors({ origin: corsOrigin }));
+// Credentials are intentionally disabled: auth uses a bearer token in the
+// Authorization header (see middleware/auth-jwt.ts), never cookies, so the
+// browser never needs to send credentials cross-origin.
+app.use(cors({ origin: corsOrigin, credentials: false }));
 app.use(express.json({ limit: "1mb" }));
 app.use(requestIdMiddleware);
 app.use(metricsMiddleware);
