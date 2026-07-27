@@ -89,6 +89,9 @@ Alternatively, trigger the smoke test via GitHub Actions without checking out lo
   - `distribution_complete`
 
 ## 7. Upgrade process
+
+Before starting an upgrade, complete the ADR for the upgrade: [docs/adr/0001-contract-upgrade-decision-record.md](../adr/0001-contract-upgrade-decision-record.md). The ADR must cover compatibility, storage migration, event schema impact, test evidence, and rollback plan before the release sign-off checklist is approved.
+
 1. New release path:
    - Build new WASM as above.
    - Deploy replacement contract to Soroban.
