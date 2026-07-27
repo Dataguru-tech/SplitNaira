@@ -77,6 +77,7 @@ It complements the existing CI/CD reliability, security, and observability runbo
 
 ## Related
 
+- [Audit log retention](../audit-log-retention.md)
 - [CI/CD data integrity](./ci-data-integrity.md)
 - [CI/CD security](./cicd-security.md)
 - [Observability](./observability.md)
