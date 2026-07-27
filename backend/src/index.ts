@@ -11,6 +11,7 @@ import { isMetricsEnabled, metricsRouter } from "./routes/metrics.js";
 import { splitsRouter } from "./routes/splits.js";
 import { docsRouter } from "./routes/docs.js";
 import { usersRouter } from "./routes/users.js";
+import { authEmailRouter } from "./routes/auth-email.js";
 import { transactionsRouter } from "./routes/transactions.js";
 import { eventsRouter } from "./routes/events.js";
 import { ledgerRouter } from "./routes/ledger.js";
@@ -132,6 +133,7 @@ app.use("/splits", (req, res, next) => {
 });
 app.use("/users/register", authLimiter);
 app.use("/users/login", authLimiter);
+app.use("/auth", authLimiter);
 app.use("/users", (req, res, next) => {
   if (req.method === "GET") return readLimiter(req, res, next);
   return writeLimiter(req, res, next);
@@ -151,6 +153,7 @@ if (isMetricsEnabled()) {
 app.use("/splits", splitsRouter);
 app.use("/ops", opsRouter);
 app.use("/docs", docsRouter);
+app.use("/auth", authEmailRouter);
 app.use("/users", usersRouter);
 app.use("/transactions", transactionsRouter);
 app.use("/events", eventsRouter);
