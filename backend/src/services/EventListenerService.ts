@@ -21,6 +21,10 @@ export const ERROR_THRESHOLD = 3;
 export const MAX_CATCHUP_LEDGERS = 10_000;
 const STARTUP_LOOKBACK_LEDGERS = 100;
 
+// Key under which the polling cursor is persisted in ServiceState so it
+// survives process restarts.
+export const EVENT_LISTENER_CURSOR_KEY = "event_listener_cursor";
+
 export type ServiceStatus = "stopped" | "healthy" | "degraded";
 
 let pollInterval: NodeJS.Timeout | null = null;
@@ -247,6 +251,20 @@ export async function pollEvents() {
           continue;
         }
 
+        const projectId = topics[1] || "";
+        const valueData = scValToNative(event.value) as [
+          string,
+          string | number | bigint
+        ];
+        const recipient = valueData[0];
+        const amount = String(valueData[1]);
+        const txHash = event.txHash;
+        const timestamp = Math.floor(
+          new Date(event.ledgerClosedAt).getTime() / 1000
+        );
+
+        // Skip already-indexed transactions. The DB also enforces uniqueness
+        // on txHash, but this avoids redundant work during polling.
         const decoded = scValToNative(event.value) as [string, string | number | bigint, number?];
         const recipient = String(decoded[0]);
         const amount = String(decoded[1]);
@@ -256,6 +274,7 @@ export async function pollEvents() {
           continue;
         }
 
+        // Resolve the project's token address; fall back to "Native".
         let token = "Native";
         try {
           const project = await fetchProjectById(projectId);

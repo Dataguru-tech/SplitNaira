@@ -5,7 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
 import swaggerUi from "swagger-ui-express";
-import { healthRouter, markStartupComplete } from "./routes/health.js";
+import { healthRouter, markStartupComplete, markShuttingDown } from "./routes/health.js";
 import { opsRouter } from "./routes/ops.js";
 import { isMetricsEnabled, metricsRouter } from "./routes/metrics.js";
 import { splitsRouter } from "./routes/splits.js";
@@ -13,7 +13,7 @@ import { docsRouter } from "./routes/docs.js";
 import { usersRouter } from "./routes/users.js";
 import { authEmailRouter } from "./routes/auth-email.js";
 import { transactionsRouter } from "./routes/transactions.js";
-import { eventsRouter } from "./routes/events.js";
+import { eventsRouter, closeAllSseConnections } from "./routes/events.js";
 import { ledgerRouter } from "./routes/ledger.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
@@ -225,6 +225,10 @@ if (process.env.NODE_ENV !== "test") {
 
       const shutdown = async (signal: NodeJS.Signals) => {
         logger.info(`Received ${signal}. Shutting down...`);
+        // Flip readiness first so load balancers stop routing new traffic
+        // here immediately, well before DB/SSE/server teardown finishes.
+        markShuttingDown();
+        closeAllSseConnections();
         stopEventListenerService();
         await closeDatabase();
         server.close((err?: Error) => {

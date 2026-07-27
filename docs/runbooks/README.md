@@ -13,6 +13,6 @@ Deployment-focused runbooks for the Stellar Wave release program. Each document 
 | [CI/CD security](./cicd-security.md) | CI/CD — security hardening | #402 |
 | [CI/CD incident management](./incident-management.md) | CI/CD — incident management | #520 |
 | [Stuck payouts incident response](./stuck-payouts.md) | Operations & Support — payouts | #861 |
-| [Contract upgrade ADR template](../adr/0001-contract-upgrade-decision-record.md) | Smart contract governance | #848 |
+| [Production readiness scorecard](./production-readiness-scorecard.md) | Release Operations — launch review | #867 |
 
 **Related:** [End-to-end deployment](../deployment.md) · [Contract release & upgrade](../contract-release-and-upgrade-runbook.md) · [Release readiness checklist](../release-readiness-checklist.md) · [Contract upgrade ADR](../adr/0001-contract-upgrade-decision-record.md) · [SECURITY.md](../../SECURITY.md)

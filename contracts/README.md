@@ -184,6 +184,45 @@ Transfers project ownership to a new address while the project is unlocked.
 - Auth: `current_owner`.
 - Errors: `NotFound`, `Unauthorized`, `ProjectLocked`.
 
+## Authorization Assumptions
+
+Every state-mutating method falls into exactly one of three authorization
+models. Table-driven coverage of the unauthorized-caller paths below lives in
+`contracts/authorization_tests.rs` (issue #865).
+
+- **Owner-gated** (`update_collaborators`, `lock_project`,
+  `update_project_metadata`, `transfer_project_ownership`): the project's
+  `owner` field is compared against the caller-supplied address *before*
+  `require_auth()` runs. A mismatch returns `SplitError::Unauthorized`. The
+  project-existence guard (`NotFound`) always runs first, so calling any of
+  these against a nonexistent project returns `NotFound`, never
+  `Unauthorized` — this is true even if the caller could never have been the
+  owner.
+- **Admin-gated** (`set_admin`, `pause_distributions`,
+  `unpause_distributions`, `set_max_collaborators`, `allow_token`,
+  `disallow_token`, `withdraw_unallocated`, `migrate_flat_to_buckets`): the
+  stored `Admin` address is compared against the caller before
+  `require_auth()` runs. If no admin has ever been configured, calls fail
+  with `AdminNotSet` rather than `Unauthorized`. `set_admin` itself is the
+  one exception — it has no `Result`-returning unauthorized path; a
+  non-admin caller fails purely via `require_auth()` panicking, since the
+  current admin's signature (not the caller's) is what's required.
+- **Collaborator-gated** (`claim`): the caller signs as `claimer` via
+  `require_auth()`, then must appear in the project's collaborator list or
+  the call fails with `NotACollaborator`.
+
+**`distribute` and `batch_distribute` are intentionally permissionless** —
+neither calls `require_auth()` at all. Anyone may trigger a distribution
+because the payout math is trustless: funds only ever move to the addresses
+and basis-point splits already recorded on the project, so there is no
+authorization boundary to enforce on the trigger itself. `deposit` is
+similarly open to any caller, gated only by `from.require_auth()` (the payer
+authorizes their own transfer in) — there is no restriction on *who* may
+fund a project.
+
+Rejected/unauthorized calls never mutate contract state — no storage write
+happens before the authorization check on every gated method above.
+
 ## Machine-Consumable Interface
 
 The generated interface artifact lives at:
