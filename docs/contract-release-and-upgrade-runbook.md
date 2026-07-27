@@ -2,6 +2,10 @@
 
 This runbook describes the end-to-end release/upgrade path for the `contracts/` workspace in SplitNaira.
 
+## Contract Interface Changes
+- Before releasing any interface-affecting update, complete [CONTRACT_INTERFACE_RELEASE_CHECKLIST.md](./CONTRACT_INTERFACE_RELEASE_CHECKLIST.md).
+- Use the checklist to verify Rust/source updates, regenerated interface/types, OpenAPI alignment, docs/changelog updates, deployment metadata, and required CI commands.
+
 ## 1. Prerequisites
 - Rust toolchain 1.76+ (stable)
 - `cargo` installed and on PATH
