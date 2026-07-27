@@ -72,6 +72,7 @@ import {
   buildUnsignedContractCall
 } from "../services/splits.service.js";
 import { logger } from "../services/logger.js";
+import { idempotencyMiddleware } from "../middleware/idempotency.js";
 
 // Re-export all schemas, contract helpers, and services for backwards compatibility
 export {
@@ -431,7 +432,19 @@ splitsRouter.put("/:projectId/collaborators", async (req, res, next) => {
   }
 });
 
-splitsRouter.post("/", async (req, res, next) => {
+/**
+ * @openapi
+ * POST /splits
+ * summary: Create a new split project
+ * description: >
+ *   Builds an unsigned XDR to create a split project. Accepts an optional
+ *   `Idempotency-Key` header (Issue #888): replaying the same key with an
+ *   identical payload returns the original response instead of resubmitting;
+ *   replaying it with a different payload returns 409 IDEMPOTENCY_KEY_CONFLICT.
+ *   Keys expire after IDEMPOTENCY_KEY_TTL_MS (default 24h).
+ * tags: [Splits]
+ */
+splitsRouter.post("/", idempotencyMiddleware(), async (req, res, next) => {
   try {
     const requestId = res.locals.requestId;
     const parsed = createSplitSchema.safeParse(req.body);
