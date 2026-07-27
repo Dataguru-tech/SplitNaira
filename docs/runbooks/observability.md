@@ -21,6 +21,8 @@ Configure Render/orchestrator probes:
 
 `GET /metrics` — Prometheus text exposition (enabled when `METRICS_ENABLED=true`, default on in production).
 
+For the complete inventory of every metric, owner, alert threshold, and missing metrics, see [Metrics Inventory](../metrics-inventory.md).
+
 Exposed series:
 
 - `splitnaira_validation_failures_total` — response schema validation failures
@@ -31,6 +33,10 @@ Exposed series:
 - `splitnaira_process_uptime_seconds`
 - `splitnaira_process_heap_bytes`
 - `splitnaira_info{version="..."}`
+- `projects_created_total` — total projects created
+- `distributions_executed_total` — total distributions executed
+- `deposits_received_total` — total deposits received
+- `sse_connections_active` — active SSE connections
 
 Contract-level telemetry is also available through on-chain event topics emitted by the SplitNaira contract. Analytics consumers should combine backend metrics with contract event streams for richer Insights.
 
