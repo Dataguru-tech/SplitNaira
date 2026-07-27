@@ -15,6 +15,7 @@ import http from "http";
 import type { Socket } from "net";
 import { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import express from "express";
 
 let server: http.Server;
 let baseUrl: string;
@@ -24,8 +25,11 @@ let getEventBus: typeof import("../services/EventBus.js").getEventBus;
 let TRANSACTION_CONFIRMED: typeof import("../services/EventBus.js").TRANSACTION_CONFIRMED;
 
 beforeAll(async () => {
-  const { app } = await import("../index.js");
+  const { eventsRouter } = await import("../routes/events.js");
   ({ getEventBus, TRANSACTION_CONFIRMED } = await import("../services/EventBus.js"));
+
+  const app = express();
+  app.use("/events", eventsRouter);
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => {
@@ -41,6 +45,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   openSockets.forEach((socket) => socket.destroy());
+  if (!server) return;
   await new Promise<void>((resolve, reject) => {
     server.close((err) => (err ? reject(err) : resolve()));
   });
@@ -96,11 +101,41 @@ describe("GET /events/transactions/:txHash (SSE)", () => {
     await new Promise((r) => setTimeout(r, 50));
     getEventBus().emit(TRANSACTION_CONFIRMED, record);
 
-    const data = (await received) as { txHash: string; status: string };
+    const data = (await received) as {
+      txHash: string;
+      roundId: string;
+      recipient: string;
+      amount: string;
+      token: string;
+      timestamp: number;
+      status: string;
+    };
     expect(data.txHash).toBe(txHash);
+    expect(data.roundId).toBe("proj-1");
+    expect(data.recipient).toBe("GREC...");
+    expect(data.amount).toBe("1000");
+    expect(data.token).toBe("Native");
+    expect(data.timestamp).toBe(1_700_000_000);
     expect(data.status).toBe("completed");
     req.destroy();
   });
+
+  it("sends heartbeat comments while the stream is idle", async () => {
+    const { res, req } = await openStream("/events/transactions/tx-heartbeat");
+
+    const gotHeartbeat = new Promise<void>((resolve) => {
+      let buffer = "";
+      res.on("data", (chunk) => {
+        buffer += chunk.toString();
+        if (buffer.includes(": heartbeat\n\n")) {
+          resolve();
+        }
+      });
+    });
+
+    await gotHeartbeat;
+    req.destroy();
+  }, 20_000);
 
   it("does not deliver events for a different txHash", async () => {
     const { res, req } = await openStream("/events/transactions/tx-mine");
@@ -116,6 +151,48 @@ describe("GET /events/transactions/:txHash (SSE)", () => {
 
     expect(gotData).toBe(false);
     req.destroy();
+  });
+
+  it("does not replay events emitted before the client subscribes", async () => {
+    const txHash = "tx-no-replay";
+    getEventBus().emit(TRANSACTION_CONFIRMED, { txHash, status: "completed" });
+
+    const { res, req } = await openStream(`/events/transactions/${txHash}`);
+    let gotData = false;
+
+    res.on("data", (chunk) => {
+      if (/data: /.test(chunk.toString())) gotData = true;
+    });
+
+    await new Promise((r) => setTimeout(r, 200));
+    expect(gotData).toBe(false);
+    req.destroy();
+  });
+
+  it("allows reconnecting and receiving updates on the new stream", async () => {
+    const txHash = "tx-reconnect";
+
+    const first = await openStream(`/events/transactions/${txHash}`);
+    first.req.destroy();
+    await new Promise((r) => setTimeout(r, 100));
+
+    const second = await openStream(`/events/transactions/${txHash}`);
+    const received = new Promise<unknown>((resolve) => {
+      let buffer = "";
+      second.res.on("data", (chunk) => {
+        buffer += chunk.toString();
+        const data = parseFirstSseData(buffer);
+        if (data) resolve(data);
+      });
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    getEventBus().emit(TRANSACTION_CONFIRMED, { txHash, status: "completed" });
+
+    const data = (await received) as { txHash: string; status: string };
+    expect(data.txHash).toBe(txHash);
+    expect(data.status).toBe("completed");
+    second.req.destroy();
   });
 
   it("cleans up the bus listener on client disconnect", async () => {
