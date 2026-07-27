@@ -958,6 +958,14 @@ export function SplitApp({
     onLoadingFlagsChange,
   ]);
 
+  // Reload dashboard data when wallet account switches
+  useEffect(() => {
+    if (activeTab === "dashboard") {
+      void onFetchDashboardData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet.address]);
+
   useEffect(() => {
     if (activeTab === "projects") {
       if (projectsList.length === 0 && !isLoadingProjectsList) {

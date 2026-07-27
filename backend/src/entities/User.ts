@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn
 } from "typeorm";
+import { DEFAULT_USER_ROLE } from "../lib/user-roles.js";
+import type { UserRole } from "../lib/user-roles.js";
 
 @Entity("users")
 export class User {
@@ -20,8 +22,8 @@ export class User {
   @Column({ type: "varchar", length: 128, nullable: true })
   alias?: string;
 
-  @Column({ type: "varchar", length: 32, default: "user" })
-  role!: string;
+  @Column({ type: "varchar", length: 32, default: DEFAULT_USER_ROLE })
+  role!: UserRole;
 
   @Column({ type: "boolean", default: true })
   isActive!: boolean;

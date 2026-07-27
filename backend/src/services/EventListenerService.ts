@@ -31,6 +31,7 @@ let pollInterval: NodeJS.Timeout | null = null;
 let isPolling = false;
 let startLedger: number | null = null;
 let cursor: string | null = null;
+const EVENT_LISTENER_CURSOR_KEY = "event_listener_cursor";
 
 // Resilience state.
 let consecutiveErrors = 0;
@@ -89,6 +90,17 @@ export async function startEventListenerService() {
 
   try {
     const server = getStellarRpcServer();
+    const stateRepo = getDataSource().getRepository(ServiceState);
+    const persistedCursor = await stateRepo.findOneBy({ key: EVENT_LISTENER_CURSOR_KEY });
+
+    if (persistedCursor?.value) {
+      cursor = persistedCursor.value;
+      startLedger = null;
+      logger.info("Initialized EventListenerService from persisted cursor");
+      schedulePolling(NORMAL_POLL_INTERVAL_MS);
+      return;
+    }
+
     const latestLedger = await executeWithRetry(() => server.getLatestLedger());
 
     // Start polling from a small lookback to cover restart gaps, but never more
@@ -206,15 +218,6 @@ export async function pollEvents() {
     const response = await executeWithRetry(() => server.getEvents(filterOptions));
 
     const newRecords: TransactionRecord[] = [];
-    const ssePayloads: Array<{
-      txHash: string;
-      roundId: string;
-      recipient: string;
-      amount: string;
-      token: string;
-      timestamp: number;
-      status: "completed";
-    }> = [];
 
     for (const event of response?.events ?? []) {
       try {
@@ -226,8 +229,25 @@ export async function pollEvents() {
           }
         });
 
-        // Only index `payment_sent` events.
-        if (topics[0] !== "payment_sent") {
+        const eventName = topics[0] || "";
+        if (
+          eventName !== "payment_sent" &&
+          eventName !== "collaborator_claimed" &&
+          eventName !== "distribution_complete"
+        ) {
+          continue;
+        }
+        const projectId = topics[1] || "";
+        const txHash = event.txHash;
+        const timestamp = Math.floor(new Date(event.ledgerClosedAt).getTime() / 1000);
+
+        if (eventName === "distribution_complete") {
+          logger.info("Indexed milestone event", {
+            eventName,
+            projectId,
+            txHash,
+            ledgerClosedAt: event.ledgerClosedAt,
+          });
           continue;
         }
 
@@ -245,6 +265,10 @@ export async function pollEvents() {
 
         // Skip already-indexed transactions. The DB also enforces uniqueness
         // on txHash, but this avoids redundant work during polling.
+        const decoded = scValToNative(event.value) as [string, string | number | bigint, number?];
+        const recipient = String(decoded[0]);
+        const amount = String(decoded[1]);
+
         const existing = await repo.findOneBy({ txHash });
         if (existing) {
           continue;
@@ -275,15 +299,6 @@ export async function pollEvents() {
             status: "completed",
           })
         );
-        ssePayloads.push({
-          txHash,
-          roundId: projectId,
-          recipient,
-          amount,
-          token,
-          timestamp,
-          status: "completed",
-        });
       } catch (eventError) {
         logger.error("Error processing polled Soroban event", {
           event,
@@ -341,10 +356,6 @@ export async function pollEvents() {
       cursor = nextCursor;
       startLedger = null;
     }
-    for (const payload of ssePayloads) {
-      publishSseEvent(payload.txHash, payload);
-    }
-
     recordPollSuccess();
   } catch (error) {
     recordPollFailure(error);

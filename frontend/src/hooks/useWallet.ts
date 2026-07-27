@@ -138,5 +138,43 @@ export function useWalletState() {
     refresh();
   }, [refresh]);
 
+  // Detect wallet account switch — when StellarWalletsKit address changes
+  // while we already had a connected wallet, reset state and reload.
+  const prevAddressRef = useRef(state.wallet.address);
+  useEffect(() => {
+    const prev = prevAddressRef.current;
+    const current = state.wallet.address;
+
+    if (prev && current && prev !== current) {
+      dispatch({ type: "RESET" });
+      refresh();
+    }
+
+    prevAddressRef.current = current;
+  }, [state.wallet.address, refresh]);
+
+  // Poll for wallet account changes every 2s while connected.
+  // Freighter does not emit events, so we poll getWalletState().
+  useEffect(() => {
+    if (!state.wallet.connected || !state.wallet.address) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await getWalletState();
+        if (
+          fresh.connected &&
+          fresh.address !== state.wallet.address
+        ) {
+          dispatch({ type: "RESET" });
+          refresh();
+        }
+      } catch {
+        // Ignore poll errors — wallet extension may be temporarily unavailable.
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [state.wallet.connected, state.wallet.address, refresh]);
+
   return { ...state, connect, refresh };
 }
