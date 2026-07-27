@@ -5,6 +5,7 @@ This checklist is the authoritative guide for contract release flow in SplitNair
 **Runbooks:** [docs/runbooks/README.md](./runbooks/README.md) — contracts (#436), CI/CD (#437), ops (#438), frontend (#439).
 
 - [x] `docs/contract-release-and-upgrade-runbook.md` exists and is up-to-date.
+- [ ] ADR completed for the upgrade: `docs/adr/0001-contract-upgrade-decision-record.md` covers compatibility, storage migration, event schema impact, test evidence, and rollback plan.
 - [x] `npm run verify:data-integrity` passes (interface JSON + generated types committed).
 - [x] `contracts/` unit tests pass (`cargo test`).
 - [x] `contracts/` formatter and linter checks pass.
