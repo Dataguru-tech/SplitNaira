@@ -4304,3 +4304,293 @@ fn test_lowered_cap_is_enforced_on_create_project() {
     );
     assert_eq!(result, Err(Ok(SplitError::TooManyCollaborators)));
 }
+
+// ============================================================
+//  COLLABORATOR UPDATE AFTER PAYOUT REGRESSION TESTS (ISSUE #895)
+// ============================================================
+
+#[test]
+fn test_update_collaborators_after_partial_payout() {
+    let (env, _token_admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let funder = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let carol = Address::generate(&env);
+
+    let collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone()]),
+        Vec::from_slice(&env, &[6000u32, 4000u32]),
+    );
+
+    let project_id = Symbol::new(&env, "partial_payout_update");
+    client.create_project(
+        &owner,
+        &project_id,
+        &String::from_str(&env, "Partial Payout Update"),
+        &String::from_str(&env, "music"),
+        &token,
+        &collabs,
+    );
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        1_000_0000000i128,
+    );
+
+    client.distribute(&project_id);
+
+    let token_balance = token::Client::new(&env, &token);
+    assert_eq!(token_balance.balance(&alice), 600_0000000i128);
+    assert_eq!(token_balance.balance(&bob), 400_0000000i128);
+    assert_eq!(client.get_balance(&project_id), 0);
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        500_0000000i128,
+    );
+    assert_eq!(client.get_balance(&project_id), 500_0000000i128);
+
+    let updated_collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone(), carol.clone()]),
+        Vec::from_slice(&env, &[4000u32, 3000u32, 3000u32]),
+    );
+    client.update_collaborators(&project_id, &owner, &updated_collabs);
+
+    let project = client.get_project(&project_id).unwrap();
+    assert_eq!(project.collaborators.len(), 3);
+    assert_eq!(project.total_distributed, 1_000_0000000i128);
+    assert_eq!(project.distribution_round, 1);
+    assert_eq!(client.get_balance(&project_id), 500_0000000i128);
+
+    client.distribute(&project_id);
+
+    assert_eq!(token_balance.balance(&alice), 600_0000000i128 + 200_0000000i128);
+    assert_eq!(token_balance.balance(&bob), 400_0000000i128 + 150_0000000i128);
+    assert_eq!(token_balance.balance(&carol), 150_0000000i128);
+    assert_eq!(client.get_balance(&project_id), 0);
+
+    let project = client.get_project(&project_id).unwrap();
+    assert_eq!(project.total_distributed, 1_500_0000000i128);
+    assert_eq!(project.distribution_round, 2);
+}
+
+#[test]
+fn test_update_collaborators_after_full_payout() {
+    let (env, _token_admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let funder = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let carol = Address::generate(&env);
+
+    let collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone()]),
+        Vec::from_slice(&env, &[7000u32, 3000u32]),
+    );
+
+    let project_id = Symbol::new(&env, "full_payout_update");
+    client.create_project(
+        &owner,
+        &project_id,
+        &String::from_str(&env, "Full Payout Update"),
+        &String::from_str(&env, "art"),
+        &token,
+        &collabs,
+    );
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        2_000_0000000i128,
+    );
+    client.distribute(&project_id);
+
+    assert_eq!(client.get_balance(&project_id), 0);
+    let project = client.get_project(&project_id).unwrap();
+    assert_eq!(project.total_distributed, 2_000_0000000i128);
+    assert_eq!(project.distribution_round, 1);
+
+    let updated_collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone(), carol.clone()]),
+        Vec::from_slice(&env, &[5000u32, 3000u32, 2000u32]),
+    );
+    client.update_collaborators(&project_id, &owner, &updated_collabs);
+
+    let project = client.get_project(&project_id).unwrap();
+    assert_eq!(project.collaborators.len(), 3);
+    assert_eq!(project.total_distributed, 2_000_0000000i128);
+    assert_eq!(project.distribution_round, 1);
+    assert_eq!(client.get_balance(&project_id), 0);
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        1_000_0000000i128,
+    );
+    client.distribute(&project_id);
+
+    let token_balance = token::Client::new(&env, &token);
+    assert_eq!(token_balance.balance(&alice), 1_400_0000000i128 + 500_0000000i128);
+    assert_eq!(token_balance.balance(&bob), 600_0000000i128 + 300_0000000i128);
+    assert_eq!(token_balance.balance(&carol), 200_0000000i128);
+
+    let project = client.get_project(&project_id).unwrap();
+    assert_eq!(project.total_distributed, 3_000_0000000i128);
+    assert_eq!(project.distribution_round, 2);
+}
+
+#[test]
+fn test_update_collaborators_preserves_claimed_ledger() {
+    let (env, _token_admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let funder = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let carol = Address::generate(&env);
+
+    let collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone()]),
+        Vec::from_slice(&env, &[5000u32, 5000u32]),
+    );
+
+    let project_id = Symbol::new(&env, "claimed_ledger_preserve");
+    client.create_project(
+        &owner,
+        &project_id,
+        &String::from_str(&env, "Claimed Ledger Preserve"),
+        &String::from_str(&env, "film"),
+        &token,
+        &collabs,
+    );
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        1_000_0000000i128,
+    );
+    client.distribute(&project_id);
+
+    assert_eq!(client.get_claimed(&project_id, &alice), 500_0000000i128);
+    assert_eq!(client.get_claimed(&project_id, &bob), 500_0000000i128);
+
+    let updated_collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone(), carol.clone()]),
+        Vec::from_slice(&env, &[4000u32, 3000u32, 3000u32]),
+    );
+    client.update_collaborators(&project_id, &owner, &updated_collabs);
+
+    assert_eq!(client.get_claimed(&project_id, &alice), 500_0000000i128);
+    assert_eq!(client.get_claimed(&project_id, &bob), 500_0000000i128);
+    assert_eq!(client.get_claimed(&project_id, &carol), 0i128);
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        1_000_0000000i128,
+    );
+    client.distribute(&project_id);
+
+    assert_eq!(client.get_claimed(&project_id, &alice), 500_0000000i128 + 400_0000000i128);
+    assert_eq!(client.get_claimed(&project_id, &bob), 500_0000000i128 + 300_0000000i128);
+    assert_eq!(client.get_claimed(&project_id, &carol), 300_0000000i128);
+
+    let project = client.get_project(&project_id).unwrap();
+    assert_eq!(project.total_distributed, 2_000_0000000i128);
+    assert_eq!(project.distribution_round, 2);
+}
+
+#[test]
+fn test_update_collaborators_after_payout_requires_owner_auth() {
+    let (env, _token_admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let funder = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let carol = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    let collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone()]),
+        Vec::from_slice(&env, &[6000u32, 4000u32]),
+    );
+
+    let project_id = Symbol::new(&env, "auth_after_payout");
+    client.create_project(
+        &owner,
+        &project_id,
+        &String::from_str(&env, "Auth After Payout"),
+        &String::from_str(&env, "music"),
+        &token,
+        &collabs,
+    );
+
+    deposit_to_project(
+        &env,
+        &client,
+        &token,
+        &project_id,
+        &funder,
+        1_000_0000000i128,
+    );
+    client.distribute(&project_id);
+
+    let updated_collabs = make_collaborators(
+        &env,
+        Vec::from_slice(&env, &[alice.clone(), bob.clone(), carol.clone()]),
+        Vec::from_slice(&env, &[5000u32, 3000u32, 2000u32]),
+    );
+
+    env.mock_auths_clear();
+    env.mock_auths(&[soroban_sdk::testutils::MockAuth {
+        address: &stranger,
+        invoke: &soroban_sdk::testutils::MockAuthInvoke {
+            contract: &contract_id,
+            fn_name: "update_collaborators",
+            args: (&project_id, &stranger, &updated_collabs).into_val(&env),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let result = client.try_update_collaborators(&project_id, &stranger, &updated_collabs);
+    assert_eq!(result, Err(Ok(SplitError::Unauthorized)));
+}
