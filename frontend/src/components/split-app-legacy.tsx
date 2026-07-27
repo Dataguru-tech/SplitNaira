@@ -141,6 +141,8 @@ export function SplitApp({
   const [txHash, setTxHash] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<TransactionReceipt | null>(null);
   const [createdProject, setCreatedProject] = useState<SplitProject | null>(null);
+  const [createRetryError, setCreateRetryError] = useState<string | null>(null);
+  const [lastCreatePayload, setLastCreatePayload] = useState<CreateSplitFormValues | null>(null);
   const latestTxHash = txHash ?? receipt?.hash ?? null;
 
   const [activeTab, setActiveTab] = useState<"dashboard" | "create" | "manage" | "projects">("dashboard");
@@ -507,6 +509,13 @@ export function SplitApp({
     setTxHash(null);
     setReceipt(null);
     setCreatedProject(null);
+    setCreateRetryError(null);
+    setLastCreatePayload(null);
+  }
+
+  function onRetryCreateSubmission() {
+    if (!lastCreatePayload || isSubmitting) return;
+    void onSubmit(lastCreatePayload);
   }
 
   function updateEditCollaborator(id: string, patch: Partial<CollaboratorInput>) {
@@ -544,6 +553,11 @@ export function SplitApp({
       basisPoints: Number.parseInt(collaborator.basisPoints, 10),
     }));
     setIsSubmitting(true);
+    setCreateRetryError(null);
+    setLastCreatePayload({
+      ...data,
+      collaborators: data.collaborators.map((c) => ({ ...c })),
+    });
     setTxHash(null);
     setReceipt(null);
     try {
@@ -579,6 +593,7 @@ export function SplitApp({
         prev?.action === "create" && prev.hash ? { ...prev, lifecycle: "success" } : prev,
       );
       notify.success("Split project created successfully.");
+      setCreateRetryError(null);
 
       try {
         const projectDetails = await getSplit(data.projectId.trim());
@@ -591,6 +606,10 @@ export function SplitApp({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to create split project.";
+      const isRetryable = /offline|network|fetch|timeout|temporar/i.test(message);
+      setCreateRetryError(
+        isRetryable ? message : "Submission failed. Verify your connection and retry.",
+      );
       setReceipt((prev) =>
         prev?.lifecycle === "confirming" && prev.action === "create"
           ? { ...prev, lifecycle: "failed", failureReason: message }
@@ -1148,6 +1167,8 @@ export function SplitApp({
             receipt={receipt}
             latestTxHash={latestTxHash}
             createdProject={createdProject}
+            createRetryError={createRetryError}
+            onRetryCreateSubmission={onRetryCreateSubmission}
             setActiveTab={setActiveTab}
             setSearchProjectId={setSearchProjectId}
             setFetchedProject={setFetchedProject}
