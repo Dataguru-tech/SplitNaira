@@ -23,7 +23,7 @@ export const usersRouter = Router();
  */
 usersRouter.post("/register", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { walletAddress, email, alias } = userRegistrationSchema.parse(req.body);
+    const { walletAddress, email, alias, role } = userRegistrationSchema.parse(req.body);
 
     // Get repository without opening a transaction
     const dataSource = getDataSource();
@@ -49,7 +49,7 @@ usersRouter.post("/register", async (req: Request, res: Response, next: NextFunc
         walletAddress,
         email,
         alias,
-        role: "user",
+        role,
         isActive: true,
       });
 

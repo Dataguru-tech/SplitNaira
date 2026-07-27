@@ -7,6 +7,7 @@ import { requestIdMiddleware } from "../middleware/request-id.js";
 import { signToken } from "../services/jwt.js";
 
 const findOneMock = vi.fn();
+const existMock = vi.fn();
 const createMock = vi.fn();
 const saveMock = vi.fn();
 const commitMock = vi.fn();
@@ -17,6 +18,7 @@ vi.mock("../services/database.js", () => ({
   getDataSource: () => ({
     getRepository: () => ({
       findOne: findOneMock,
+      exist: existMock,
       create: createMock,
       save: saveMock
     })
@@ -32,6 +34,7 @@ vi.mock("../services/database.js", () => ({
   }) => Promise<unknown>) => {
     const repository = {
       findOne: findOneMock,
+      exist: existMock,
       create: createMock,
       save: saveMock
     };
@@ -71,9 +74,10 @@ describe("User Registration API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockImplementation((input) => input);
+    existMock.mockResolvedValue(false);
     saveMock.mockImplementation(async (input) => ({
       id: "11111111-1111-4111-8111-111111111111",
-      role: "user",
+      role: "customer",
       isActive: true,
       createdAt: NOW,
       updatedAt: NOW,
@@ -91,7 +95,8 @@ describe("User Registration API", () => {
         .send({
           walletAddress: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
           email: "test@example.com",
-          alias: "TestUser"
+          alias: "TestUser",
+          role: "company"
         });
 
       expect(response.status).toBe(201);
@@ -99,8 +104,22 @@ describe("User Registration API", () => {
       expect(response.body.walletAddress).toBe("GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF");
       expect(response.body.email).toBe("test@example.com");
       expect(response.body.alias).toBe("TestUser");
-      expect(response.body.role).toBe("user");
+      expect(response.body.role).toBe("company");
       expect(response.body.isActive).toBe(true);
+    });
+
+    it("should default to customer role when no persona is provided", async () => {
+      findOneMock.mockResolvedValue(null);
+      const app = createApp();
+
+      const response = await request(app)
+        .post("/users/register")
+        .send({
+          walletAddress: "GBIRMAYQUTHQC762ZTJTNXWDSHSDGN64ZXPXJ6XRLWJCAF6TS4Z7J7IO"
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.role).toBe("customer");
     });
 
     it("should register a user without optional fields", async () => {
@@ -119,17 +138,14 @@ describe("User Registration API", () => {
     });
 
     it("should reject duplicate wallet address", async () => {
-      findOneMock.mockResolvedValue({
-        id: "existing-user",
-        walletAddress: "GAFY5DYD3EEUWPHL2JHAWFOLKEI2IAQRAVW4Y3L6DLJQOXG2TAJMU7GC"
-      });
+      existMock.mockResolvedValue(true);
       const app = createApp();
 
       const response = await request(app)
         .post("/users/register")
         .send({ walletAddress: "GAFY5DYD3EEUWPHL2JHAWFOLKEI2IAQRAVW4Y3L6DLJQOXG2TAJMU7GC" });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(409);
       expect(response.body.error).toBeDefined();
     });
 
@@ -169,7 +185,7 @@ describe("User Registration API", () => {
         walletAddress,
         email: undefined,
         alias: "GetTestUser",
-        role: "user",
+        role: "customer",
         isActive: true,
         createdAt: NOW,
         updatedAt: NOW
@@ -211,7 +227,7 @@ describe("User Registration API", () => {
         walletAddress,
         email: "test@example.com",
         alias: "LoginUser",
-        role: "user",
+        role: "driver",
         isActive: true,
         createdAt: NOW,
         updatedAt: NOW
@@ -298,7 +314,7 @@ describe("User Registration API", () => {
         walletAddress,
         email: "old@example.com",
         alias: "OldAlias",
-        role: "user",
+        role: "customer",
         isActive: true,
         createdAt,
         updatedAt: updatedAtBefore
@@ -309,7 +325,7 @@ describe("User Registration API", () => {
         walletAddress,
         email: "new@example.com",
         alias: "NewAlias",
-        role: "user",
+        role: "customer",
         isActive: true,
         createdAt,
         updatedAt: updatedAtAfter
@@ -359,7 +375,7 @@ describe("User Registration API", () => {
         walletAddress,
         email: "me@test.com",
         alias: "MeUser",
-        role: "user",
+        role: "customer",
         isActive: true,
         createdAt: NOW,
         updatedAt: NOW
@@ -375,7 +391,7 @@ describe("User Registration API", () => {
       expect(response.body.walletAddress).toBe(walletAddress);
       expect(response.body.email).toBe("me@test.com");
       expect(response.body.alias).toBe("MeUser");
-      expect(response.body.role).toBe("user");
+      expect(response.body.role).toBe("customer");
     });
 
     it("should return 401 when no auth token is provided", async () => {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { StrKey } from "@stellar/stellar-sdk";
+import { DEFAULT_USER_ROLE, USER_ROLES } from "../lib/user-roles.js";
 
 // Stellar address validator
 export const stellarAddressSchema = z
@@ -14,6 +15,7 @@ export const userRegistrationSchema = z.object({
   walletAddress: stellarAddressSchema,
   email: z.string().email("Invalid email format").optional(),
   alias: z.string().min(1, "Alias is required").max(64, "Alias must be at most 64 characters").optional(),
+  role: z.enum(USER_ROLES).default(DEFAULT_USER_ROLE),
 });
 
 
@@ -23,7 +25,7 @@ export const userResponseSchema = z.object({
   walletAddress: z.string(),
   email: z.string().optional(),
   alias: z.string().optional(),
-  role: z.string(),
+  role: z.enum(USER_ROLES),
   isActive: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
