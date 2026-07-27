@@ -323,18 +323,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: RATE_LIMIT_EXCEEDED
+                message: Too many requests. Please retry after the rate limit window.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
     post:
       summary: Create a new split project
       description: Builds an unsigned Soroban transaction XDR to create a new
@@ -441,12 +459,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}:
     get:
       summary: Get project details by ID
@@ -492,12 +518,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/lock:
     post:
       summary: Lock a project permanently
@@ -555,12 +589,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/deposit:
     post:
       summary: Deposit funds into a project
@@ -644,12 +686,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/metadata:
     patch:
       summary: Update project metadata (title/category)
@@ -713,12 +763,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/collaborators:
     put:
       summary: Update project collaborators
@@ -828,12 +886,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/distribute:
     post:
       summary: Distribute project funds to collaborators
@@ -907,12 +973,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/claimable/{collaborator}:
     get:
       summary: Get claimable payout information for a collaborator
@@ -966,12 +1040,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/claim:
     post:
       summary: Claim collaborator payout
@@ -1029,12 +1111,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/{projectId}/history:
     get:
       summary: Get project transaction history
@@ -1131,12 +1221,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /events:
     get:
       summary: Observe transaction status updates for a submitted XDR (SSE)
@@ -1296,18 +1394,36 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/allow-token:
     post:
       summary: Allow a payment token
@@ -1357,24 +1473,46 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "503":
           description: Service temporarily unavailable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: SERVICE_UNAVAILABLE
+                message: The service is temporarily unavailable. Please try again shortly.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/disallow-token:
     post:
       summary: Disallow a payment token
@@ -1424,24 +1562,46 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "503":
           description: Service temporarily unavailable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: SERVICE_UNAVAILABLE
+                message: The service is temporarily unavailable. Please try again shortly.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/pause-distributions:
     post:
       summary: Pause all distributions
@@ -1486,24 +1646,46 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "503":
           description: Service temporarily unavailable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: SERVICE_UNAVAILABLE
+                message: The service is temporarily unavailable. Please try again shortly.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/unpause-distributions:
     post:
       summary: Unpause distributions
@@ -1548,24 +1730,46 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "503":
           description: Service temporarily unavailable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: SERVICE_UNAVAILABLE
+                message: The service is temporarily unavailable. Please try again shortly.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/status:
     get:
       summary: Get admin contract status
@@ -1592,18 +1796,36 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/is-token-allowed:
     get:
       summary: Check if a token is allowed
@@ -1652,18 +1874,36 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/token-count:
     get:
       summary: Get allowed token count
@@ -1694,18 +1934,36 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/unallocated:
     get:
       summary: Get unallocated token balance
@@ -1754,18 +2012,36 @@ paths:
                 error: UNAUTHORIZED
                 message: Missing or invalid bearer token / admin API key.
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: FORBIDDEN
+                message: You do not have permission to perform this action.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/withdraw-unallocated:
     post:
       summary: Withdraw unallocated tokens
@@ -1832,18 +2108,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "502":
           description: Upstream RPC or contract error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: BAD_GATEWAY
+                message: The Stellar network RPC call failed. Please retry.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "503":
           description: Service temporarily unavailable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: SERVICE_UNAVAILABLE
+                message: The service is temporarily unavailable. Please try again shortly.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /splits/admin/cache-stats:
     get:
       summary: Get read cache statistics
@@ -1889,6 +2177,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /users/register:
     post:
       summary: Register a new user
@@ -1957,12 +2249,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: CONFLICT
+                message: A project with ID "afrobeats_001" already exists.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /users/login:
     post:
       summary: Log in by wallet address
@@ -2037,6 +2337,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /users/me:
     get:
       summary: Get authenticated user profile
@@ -2103,6 +2407,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
     patch:
       summary: Update authenticated user profile
       description: Updates email or alias for the authenticated user.
@@ -2187,6 +2495,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /users/{walletAddress}:
     get:
       summary: Get user by wallet address
@@ -2254,6 +2566,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /transactions/history:
     get:
       summary: Query payout transaction history
@@ -2373,6 +2689,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /transactions/{txHash}:
     get:
       summary: Get transaction by hash
@@ -2445,6 +2765,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /transactions/recipient/{walletAddress}:
     get:
       summary: List transactions for a recipient
@@ -2520,6 +2844,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              example:
+                error: INTERNAL_ERROR
+                message: An unexpected error occurred. Please try again later.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
   /health:
     get:
       summary: Get readiness status (alias for /health/ready)
