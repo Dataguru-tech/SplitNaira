@@ -118,10 +118,15 @@ function standardErrorResponses(options: {
   badRequest?: boolean;
   badRequestExample?: Record<string, unknown>;
   unauthorized?: boolean;
+  forbidden?: boolean;
   notFound?: boolean;
   conflict?: boolean;
+  conflictExample?: Record<string, unknown>;
+  rateLimited?: boolean;
   serverError?: boolean;
+  serverErrorExample?: Record<string, unknown>;
   badGateway?: boolean;
+  badGatewayExample?: Record<string, unknown>;
   unavailable?: boolean;
 } = {}) {
   const responses: Record<number, ReturnType<typeof apiErrorResponse>> = {};
@@ -135,6 +140,13 @@ function standardErrorResponses(options: {
       requestId: EXAMPLE_REQUEST_ID,
     });
   }
+  if (options.forbidden) {
+    responses[403] = apiErrorResponse("Access denied", {
+      error: "FORBIDDEN",
+      message: "You do not have permission to perform this action.",
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
   if (options.notFound) {
     responses[404] = apiErrorResponse("Resource not found", {
       error: "NOT_FOUND",
@@ -142,10 +154,41 @@ function standardErrorResponses(options: {
       requestId: EXAMPLE_REQUEST_ID,
     });
   }
-  if (options.conflict) responses[409] = apiErrorResponse("Conflict with existing resource");
-  if (options.serverError) responses[500] = apiErrorResponse("Internal server error");
-  if (options.badGateway) responses[502] = apiErrorResponse("Upstream RPC or contract error");
-  if (options.unavailable) responses[503] = apiErrorResponse("Service temporarily unavailable");
+  if (options.conflict) {
+    responses[409] = apiErrorResponse("Conflict with existing resource", options.conflictExample ?? {
+      error: "CONFLICT",
+      message: `A project with ID "${EXAMPLE_PROJECT_ID}" already exists.`,
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
+  if (options.rateLimited) {
+    responses[429] = apiErrorResponse("Too many requests", {
+      error: "RATE_LIMIT_EXCEEDED",
+      message: "Too many requests. Please retry after the rate limit window.",
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
+  if (options.serverError) {
+    responses[500] = apiErrorResponse("Internal server error", options.serverErrorExample ?? {
+      error: "INTERNAL_ERROR",
+      message: "An unexpected error occurred. Please try again later.",
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
+  if (options.badGateway) {
+    responses[502] = apiErrorResponse("Upstream RPC or contract error", options.badGatewayExample ?? {
+      error: "BAD_GATEWAY",
+      message: "The Stellar network RPC call failed. Please retry.",
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
+  if (options.unavailable) {
+    responses[503] = apiErrorResponse("Service temporarily unavailable", {
+      error: "SERVICE_UNAVAILABLE",
+      message: "The service is temporarily unavailable. Please try again shortly.",
+      requestId: EXAMPLE_REQUEST_ID,
+    });
+  }
   return responses;
 }
 
@@ -212,7 +255,7 @@ registry.registerPath({
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, rateLimited: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -741,7 +784,7 @@ registry.registerPath({
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -757,7 +800,7 @@ registry.registerPath({
   },
   responses: {
     200: { description: "Unsigned transaction XDR", content: { "application/json": { schema: XdrResponseSchema } } },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, unavailable: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, unavailable: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -773,7 +816,7 @@ registry.registerPath({
   },
   responses: {
     200: { description: "Unsigned transaction XDR", content: { "application/json": { schema: XdrResponseSchema } } },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, unavailable: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, unavailable: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -789,7 +832,7 @@ registry.registerPath({
   },
   responses: {
     200: { description: "Unsigned transaction XDR", content: { "application/json": { schema: XdrResponseSchema } } },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, unavailable: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, unavailable: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -805,7 +848,7 @@ registry.registerPath({
   },
   responses: {
     200: { description: "Unsigned transaction XDR", content: { "application/json": { schema: XdrResponseSchema } } },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, unavailable: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, unavailable: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -821,7 +864,7 @@ registry.registerPath({
       description: "Admin status",
       content: { "application/json": { schema: AdminStatusSchema } },
     },
-    ...standardErrorResponses({ unauthorized: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ unauthorized: true, forbidden: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -842,7 +885,7 @@ registry.registerPath({
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -862,7 +905,7 @@ registry.registerPath({
         },
       },
     },
-    ...standardErrorResponses({ unauthorized: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ unauthorized: true, forbidden: true, badGateway: true, serverError: true }),
   },
 });
 
@@ -883,7 +926,7 @@ registry.registerPath({
         },
       },
     },
-    ...standardErrorResponses({ badRequest: true, unauthorized: true, badGateway: true, serverError: true }),
+    ...standardErrorResponses({ badRequest: true, unauthorized: true, forbidden: true, badGateway: true, serverError: true }),
   },
 });
 
