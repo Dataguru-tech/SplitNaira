@@ -16,6 +16,7 @@ import { eventsRouter } from "./routes/events.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import { requestIdMiddleware } from "./middleware/request-id.js";
 import { metricsMiddleware } from "./middleware/metrics.js";
+import { requestTimeout } from "./middleware/timeout.js";
 import {
   globalLimiter,
   readLimiter,
@@ -82,6 +83,7 @@ app.use(cors({ origin: corsOrigin }));
 app.use(express.json({ limit: "1mb" }));
 app.use(requestIdMiddleware);
 app.use(metricsMiddleware);
+app.use(requestTimeout());
 
 app.use(globalLimiter);
 
