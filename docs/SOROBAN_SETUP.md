@@ -102,6 +102,13 @@ cargo test --locked
 cargo build --release --target wasm32v1-none --locked
 ```
 
+## Build Target Note: `wasm32v1-none` vs `wasm32-unknown-unknown`
+
+SplitNaira builds Soroban contracts targeting `wasm32v1-none` rather than the older `wasm32-unknown-unknown` target.
+
+- **`wasm32v1-none`**: Introduced in modern Rust toolchains as a Tier 2 target for bare-metal WebAssembly v1. It operates without operating system assumptions, std imports, or legacy C runtime linkage, generating optimized, smaller WASM binaries specifically suited for Soroban runtime requirements.
+- **`wasm32-unknown-unknown`**: The legacy target used by older WebAssembly build tooling. It contains assumptions about host system calls and standard library abstractions that are unnecessary and less efficient for Soroban smart contract environments.
+
 ## Deploy artifacts
 - `contracts/target/wasm32v1-none/release/splitnaira_contract.wasm`
 - `contracts/target/wasm32v1-none/release/splitnaira_contract.wasm.sha256`
