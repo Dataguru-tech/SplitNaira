@@ -1,0 +1,16 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https?://",
+      "comment": "Skip external URLs — only validate relative internal links"
+    },
+    {
+      "pattern": "^mailto:",
+      "comment": "Skip email links"
+    }
+  ],
+  "retryOn429": true,
+  "retryCount": 2,
+  "fallbackRetryDelay": "30s",
+  "aliveStatusCodes": [200, 206]
+}

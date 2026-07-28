@@ -398,3 +398,89 @@ fn test_distribute_is_permissionless_by_design() {
     let result = client.try_distribute(&project_id);
     assert!(result.is_ok());
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Admin key rotation authorization (issue #941)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// An unauthorized caller cannot rotate the contract admin.
+///
+/// `set_admin` requires the *currently stored* admin to authorize the call.
+/// Clearing all auth entries before the call removes that authorization so the
+/// host-level auth check fires, and the stored admin address must remain the
+/// original one (verified by confirming the original admin can still perform
+/// admin-gated operations while the attacker cannot).
+#[test]
+fn test_set_admin_rejects_unauthorized_rotation_and_preserves_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _) = make_client(&env);
+
+    let original_admin = Address::generate(&env);
+    let attacker = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(token_admin);
+
+    // Install the initial admin.
+    client.set_admin(&original_admin);
+
+    // Drain all authorization entries — the stored admin has not signed.
+    // `set_admin` calls `current_admin.require_auth()`, so without that
+    // signature the host rejects the invocation.
+    env.set_auths(&[]);
+    let result = client.try_set_admin(&attacker);
+    assert!(result.is_err(), "unauthorized rotation must be rejected");
+
+    // Restore full auth mocking to probe the post-attempt state.
+    env.mock_all_auths();
+
+    // The original admin must still control the contract.
+    let allow_result = client.try_allow_token(&original_admin, &token);
+    assert!(
+        allow_result.is_ok(),
+        "original admin must retain control after a failed rotation attempt"
+    );
+    assert!(client.is_token_allowed(&token));
+
+    // The attacker must not have gained admin rights.
+    let attacker_result = client.try_allow_token(&attacker, &token);
+    assert_eq!(
+        attacker_result,
+        Err(Ok(SplitError::Unauthorized)),
+        "attacker must not acquire admin privileges"
+    );
+}
+
+/// The current admin can successfully rotate the contract admin to a new address.
+///
+/// After rotation the new admin must be able to perform admin-gated operations
+/// and the previous admin must lose those privileges.
+#[test]
+fn test_set_admin_successful_rotation_transfers_control() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _) = make_client(&env);
+
+    let original_admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(token_admin);
+
+    // Bootstrap with an initial admin then rotate.
+    client.set_admin(&original_admin);
+    let rotation_result = client.try_set_admin(&new_admin);
+    assert!(rotation_result.is_ok(), "admin rotation by current admin must succeed");
+
+    // New admin can now perform admin-gated operations.
+    let allow_result = client.try_allow_token(&new_admin, &token);
+    assert!(allow_result.is_ok(), "new admin must be able to allow tokens");
+    assert!(client.is_token_allowed(&token));
+
+    // Former admin no longer has privileges.
+    let old_admin_result = client.try_allow_token(&original_admin, &token);
+    assert_eq!(
+        old_admin_result,
+        Err(Ok(SplitError::Unauthorized)),
+        "former admin must lose privileges after rotation"
+    );
+}

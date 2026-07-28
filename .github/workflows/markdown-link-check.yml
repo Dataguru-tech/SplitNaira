@@ -1,0 +1,50 @@
+name: Markdown Link Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**/*.md'
+      - 'runbooks/**/*.md'
+      - '*.md'
+  pull_request:
+    paths:
+      - 'docs/**/*.md'
+      - 'runbooks/**/*.md'
+      - '*.md'
+
+permissions:
+  contents: read
+
+jobs:
+  link-check:
+    name: Check Markdown links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install markdown-link-check
+        run: npm install -g markdown-link-check
+
+      - name: Check internal relative links in docs
+        run: |
+          find docs runbooks -name "*.md" -print0 \
+            | xargs -0 -I{} markdown-link-check \
+                --config .github/markdown-link-check-config.json \
+                --verbose \
+                {} \
+            || EXIT_CODE=$?
+          # Also check top-level markdown files
+          find . -maxdepth 1 -name "*.md" -print0 \
+            | xargs -0 -I{} markdown-link-check \
+                --config .github/markdown-link-check-config.json \
+                --verbose \
+                {} \
+            || EXIT_CODE=$?
+          exit ${EXIT_CODE:-0}
