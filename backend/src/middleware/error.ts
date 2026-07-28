@@ -54,6 +54,7 @@ function resolveAppErrorStatus(err: AppError): number {
   // request is malformed" instead of "you're not authenticated" — the
   // wrong signal for e.g. a frontend deciding whether to redirect to login.
   if (err.type === ErrorType.AUTH) return 401;
+  if (err.type === ErrorType.CONFLICT) return 409;
   return 500;
 }
 

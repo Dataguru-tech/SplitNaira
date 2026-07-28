@@ -382,11 +382,89 @@
       }
     },
     "/splits": {
+      "get": {
+        "tags": [
+          "splits"
+        ],
+        "summary": "List split projects",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "example": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 100,
+              "example": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of projects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/SplitProject" }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestIdError" }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestIdError" }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestIdError" }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "splits"
         ],
         "summary": "Build unsigned transaction to create a split project",
+        "description": "Accepts an optional Idempotency-Key header (Issue #888). Replaying the same key with an identical payload returns the original response instead of resubmitting; replaying it with a different payload returns 409 IDEMPOTENCY_KEY_CONFLICT. Keys expire after IDEMPOTENCY_KEY_TTL_MS (default 24h).",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "550e8400-e29b-41d4-a716-446655440000"
+            },
+            "description": "Client-generated unique token identifying this create-split request."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -420,6 +498,19 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/RequestIdError" }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key was already used with a different request payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RequestIdError" },
+                "example": {
+                  "error": "IDEMPOTENCY_KEY_CONFLICT",
+                  "code": "IDEMPOTENCY_KEY_CONFLICT",
+                  "message": "Idempotency-Key was already used with a different request payload."
+                }
               }
             }
           },
@@ -621,73 +712,6 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/BuildTransactionResponse" }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestIdError" }
-              }
-            }
-          },
-          "429": {
-            "description": "Rate limited",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestIdError" }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/RequestIdError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/splits": {
-      "get": {
-        "tags": [
-          "splits"
-        ],
-        "summary": "List split projects",
-        "parameters": [
-          {
-            "name": "start",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 0,
-              "example": 0
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "default": 10,
-              "minimum": 1,
-              "maximum": 100,
-              "example": 10
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of projects",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": { "$ref": "#/components/schemas/SplitProject" }
-                }
               }
             }
           },

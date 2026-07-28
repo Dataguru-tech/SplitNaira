@@ -973,3 +973,149 @@ describe("POST /splits/:projectId/claim", () => {
     expect(res.body.error).toBe("validation_error");
   });
 });
+
+// ============================================================
+// Issue #888: API idempotency key support for create split requests
+// ============================================================
+
+describe("POST /splits idempotency (Issue #888)", () => {
+  const VALID_OWNER = "GOWNER";
+  const VALID_TOKEN = "GTOKENADDRESS";
+  const VALID_COLLAB_A = "GCOLLAB1";
+  const VALID_COLLAB_B = "GCOLLAB2";
+
+  const buildCreatePayload = (overrides: Record<string, unknown> = {}) => ({
+    owner: VALID_OWNER,
+    projectId: "idem_project",
+    title: "Idempotency Project",
+    projectType: "music",
+    token: VALID_TOKEN,
+    collaborators: [
+      { address: VALID_COLLAB_A, alias: "A", basisPoints: 6000 },
+      { address: VALID_COLLAB_B, alias: "B", basisPoints: 4000 },
+    ],
+    ...overrides,
+  });
+
+  const mockSuccessfulBuild = () => {
+    getAccountMock.mockResolvedValue({ accountId: VALID_OWNER });
+    prepareTransactionMock.mockResolvedValue({
+      toXDR: () => "XDR_IDEMPOTENT",
+      sequence: "1",
+      fee: "100",
+    });
+  };
+
+  it("first request with an Idempotency-Key succeeds and executes normally", async () => {
+    mockSuccessfulBuild();
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/splits")
+      .set("Idempotency-Key", "first-request-key")
+      .send(buildCreatePayload())
+      .expect(200);
+
+    expect(res.body.xdr).toBe("XDR_IDEMPOTENT");
+    expect(res.headers["idempotency-replayed"]).toBeUndefined();
+    expect(prepareTransactionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays the original response for a repeated request with the same key and payload", async () => {
+    mockSuccessfulBuild();
+    const app = createApp();
+    const payload = buildCreatePayload({ projectId: "idem_replay" });
+
+    const first = await request(app)
+      .post("/splits")
+      .set("Idempotency-Key", "replay-key")
+      .send(payload)
+      .expect(200);
+
+    const second = await request(app)
+      .post("/splits")
+      .set("Idempotency-Key", "replay-key")
+      .send(payload)
+      .expect(200);
+
+    expect(second.body).toEqual(first.body);
+    expect(second.headers["idempotency-replayed"]).toBe("true");
+    // The underlying build only ran once; the replay was served from the store.
+    expect(prepareTransactionMock).toHaveBeenCalledTimes(1);
+    expect(getAccountMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a replay with the same key but a different payload with a stable 409 conflict", async () => {
+    mockSuccessfulBuild();
+    const app = createApp();
+
+    await request(app)
+      .post("/splits")
+      .set("Idempotency-Key", "conflict-key")
+      .send(buildCreatePayload({ projectId: "idem_conflict_a" }))
+      .expect(200);
+
+    const conflictRes = await request(app)
+      .post("/splits")
+      .set("Idempotency-Key", "conflict-key")
+      .send(buildCreatePayload({ projectId: "idem_conflict_b" }))
+      .expect(409);
+
+    expect(conflictRes.body.code).toBe("IDEMPOTENCY_KEY_CONFLICT");
+    expect(prepareTransactionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a malformed Idempotency-Key header with 400 validation_error", async () => {
+    const app = createApp();
+
+    const res = await request(app)
+      .post("/splits")
+      .set("Idempotency-Key", "not a valid key!!")
+      .send(buildCreatePayload())
+      .expect(400);
+
+    expect(res.body.error).toBe("validation_error");
+    expect(getAccountMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a request as new once the Idempotency-Key has expired", async () => {
+    mockSuccessfulBuild();
+    const app = createApp();
+
+    // Only fake `Date` (used by the idempotency store's TTL clock) — faking
+    // setTimeout/setImmediate too would stall supertest's real socket I/O.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await request(app)
+        .post("/splits")
+        .set("Idempotency-Key", "expiring-key")
+        .send(buildCreatePayload({ projectId: "idem_expire_a" }))
+        .expect(200);
+
+      // Default TTL is 24h; advance just past it so the key is treated as new.
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+
+      const afterExpiry = await request(app)
+        .post("/splits")
+        .set("Idempotency-Key", "expiring-key")
+        .send(buildCreatePayload({ projectId: "idem_expire_b" }))
+        .expect(200);
+
+      expect(afterExpiry.headers["idempotency-replayed"]).toBeUndefined();
+      expect(prepareTransactionMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not apply idempotency handling when no Idempotency-Key header is sent", async () => {
+    mockSuccessfulBuild();
+    const app = createApp();
+    const payload = buildCreatePayload({ projectId: "idem_no_header" });
+
+    await request(app).post("/splits").send(payload).expect(200);
+    await request(app).post("/splits").send(payload).expect(200);
+
+    expect(prepareTransactionMock).toHaveBeenCalledTimes(2);
+  });
+});

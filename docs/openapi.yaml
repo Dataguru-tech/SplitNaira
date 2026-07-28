@@ -355,12 +355,36 @@ paths:
                 requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
     post:
       summary: Create a new split project
-      description: Builds an unsigned Soroban transaction XDR to create a new
+      description: "Builds an unsigned Soroban transaction XDR to create a new
         revenue-split project on-chain. The caller must sign the returned XDR
         with the `owner` wallet and submit it themselves; this endpoint never
-        holds a private key.
+        holds a private key. Supports an optional `Idempotency-Key` header
+        (Issue #888) so retried requests don't produce duplicate
+        project-creation attempts."
       tags:
         - Splits
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+            pattern: ^[A-Za-z0-9_.:-]+$
+            example: 550e8400-e29b-41d4-a716-446655440000
+            description: "Client-generated unique token identifying this create-split
+              request (Issue #888). Replaying the same key with an identical
+              payload returns the original response instead of resubmitting;
+              replaying it with a different payload returns 409
+              IDEMPOTENCY_KEY_CONFLICT. Keys expire after IDEMPOTENCY_KEY_TTL_MS
+              (default 24h), after which the request is treated as new."
+          required: false
+          description: "Client-generated unique token identifying this create-split
+            request (Issue #888). Replaying the same key with an identical
+            payload returns the original response instead of resubmitting;
+            replaying it with a different payload returns 409
+            IDEMPOTENCY_KEY_CONFLICT. Keys expire after IDEMPOTENCY_KEY_TTL_MS
+            (default 24h), after which the request is treated as new."
+          name: Idempotency-Key
+          in: header
       requestBody:
         content:
           application/json:
@@ -453,6 +477,17 @@ paths:
                 details:
                   path:
                     - collaborators
+        "409":
+          description: Conflict with existing resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                error: IDEMPOTENCY_KEY_CONFLICT
+                code: IDEMPOTENCY_KEY_CONFLICT
+                message: Idempotency-Key was already used with a different request payload.
+                requestId: b6f1a2d4-8c3e-4a1b-9f2e-6d5c7a8b9c0d
         "500":
           description: Internal server error
           content:
@@ -2203,6 +2238,13 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 64
+                role:
+                  type: string
+                  enum:
+                    - company
+                    - customer
+                    - driver
+                  default: customer
               required:
                 - walletAddress
       responses:
@@ -2224,6 +2266,10 @@ paths:
                     type: string
                   role:
                     type: string
+                    enum:
+                      - company
+                      - customer
+                      - driver
                   isActive:
                     type: boolean
                   createdAt:
@@ -2299,6 +2345,10 @@ paths:
                     type: string
                   role:
                     type: string
+                    enum:
+                      - company
+                      - customer
+                      - driver
                   isActive:
                     type: boolean
                   createdAt:
@@ -2368,6 +2418,10 @@ paths:
                     type: string
                   role:
                     type: string
+                    enum:
+                      - company
+                      - customer
+                      - driver
                   isActive:
                     type: boolean
                   createdAt:
@@ -2450,6 +2504,10 @@ paths:
                     type: string
                   role:
                     type: string
+                    enum:
+                      - company
+                      - customer
+                      - driver
                   isActive:
                     type: boolean
                   createdAt:
@@ -2531,6 +2589,10 @@ paths:
                     type: string
                   role:
                     type: string
+                    enum:
+                      - company
+                      - customer
+                      - driver
                   isActive:
                     type: boolean
                   createdAt:

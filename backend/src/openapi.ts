@@ -222,6 +222,24 @@ const ProjectSchema = registry.register(
   })
 );
 
+const idempotencyKeyHeaderSchema = z.object({
+  "Idempotency-Key": z
+    .string()
+    .min(1)
+    .max(255)
+    .regex(/^[A-Za-z0-9_.:-]+$/)
+    .optional()
+    .openapi({
+      example: "550e8400-e29b-41d4-a716-446655440000",
+      description:
+        "Client-generated unique token identifying this create-split request (Issue #888). " +
+        "Replaying the same key with an identical payload returns the original response " +
+        "instead of resubmitting; replaying it with a different payload returns 409 " +
+        "IDEMPOTENCY_KEY_CONFLICT. Keys expire after IDEMPOTENCY_KEY_TTL_MS (default 24h), " +
+        "after which the request is treated as new.",
+    }),
+});
+
 const XdrResponseSchema = registry.register(
   "XdrResponse",
   z.object({
@@ -266,9 +284,11 @@ registry.registerPath({
   description:
     "Builds an unsigned Soroban transaction XDR to create a new revenue-split project on-chain. " +
     "The caller must sign the returned XDR with the `owner` wallet and submit it themselves; " +
-    "this endpoint never holds a private key.",
+    "this endpoint never holds a private key. Supports an optional `Idempotency-Key` header " +
+    "(Issue #888) so retried requests don't produce duplicate project-creation attempts.",
   tags: ["Splits"],
   request: {
+    headers: idempotencyKeyHeaderSchema,
     body: {
       content: {
         "application/json": {
@@ -300,6 +320,13 @@ registry.registerPath({
     },
     ...standardErrorResponses({
       badRequest: true,
+      conflict: true,
+      conflictExample: {
+        error: "IDEMPOTENCY_KEY_CONFLICT",
+        code: "IDEMPOTENCY_KEY_CONFLICT",
+        message: "Idempotency-Key was already used with a different request payload.",
+        requestId: EXAMPLE_REQUEST_ID,
+      },
       badGateway: true,
       serverError: true,
       badRequestExample: {
