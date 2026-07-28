@@ -40,6 +40,8 @@ mod hardening_tests;
 mod reliability_tests;
 #[cfg(test)]
 mod authorization_tests;
+#[cfg(test)]
+mod address_validation_tests;
 
 use errors::SplitError;
 
