@@ -10,6 +10,35 @@ This doc explains the supported Soroban toolchain for SplitNaira.
 
 ## Install
 
+### Rust (Linux)
+```bash
+# Install rustup and stable Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Source environment
+source "$HOME/.cargo/env"
+
+# Ensure stable channel is default and updated
+rustup default stable
+rustup update
+
+# Install build essential dependencies (Ubuntu/Debian)
+sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+```
+
+### Rust (macOS)
+```bash
+# Option 1: Via rustup shell script (recommended)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustup default stable
+rustup update
+
+# Option 2: Via Homebrew
+brew install rustup-init
+rustup-init
+```
+
 ### Rust (Windows)
 ```powershell
 # Using rustup (PowerShell or CMD)
