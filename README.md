@@ -255,6 +255,7 @@ npm run analyze
 
 ## Documentation
 
+- [Architecture Overview](./docs/ARCHITECTURE.md)
 - [Deployment Runbook](./docs/deployment.md)
 - [Operational Runbooks](./docs/runbooks/README.md) (contracts, CI/CD, ops, frontend)
 - [Contributing Guide](./CONTRIBUTING.md)
