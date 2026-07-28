@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { clsx } from "clsx";
 import { sanitizeText } from "@/lib/security";
 import type { SplitProject } from "@/lib/stellar";
@@ -60,6 +61,25 @@ export function ProjectsList({
   getExplorerUrl,
   getExplorerLabel,
 }: ProjectsListProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const trimmedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredProjectsList = useMemo(() => {
+    if (!trimmedQuery) return projectsList;
+    return projectsList.filter((p) => {
+      if (p.title.toLowerCase().includes(trimmedQuery)) return true;
+      return p.collaborators.some(
+        (collab) =>
+          collab.alias.toLowerCase().includes(trimmedQuery) ||
+          collab.address.toLowerCase().includes(trimmedQuery),
+      );
+    });
+  }, [projectsList, trimmedQuery]);
+
+  const isSearchActive = trimmedQuery.length > 0;
+  const clearSearch = () => setSearchQuery("");
+
   return (
     <div className="space-y-10">
       {selectedProjectId === null ? (
@@ -102,11 +122,38 @@ export function ProjectsList({
               </div>
             )}
           </div>
+
+          <div className="glass-card rounded-[2.5rem] p-6 md:p-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="flex-1">
+              <label htmlFor="project-search-input" className="sr-only">
+                Search projects by name or collaborator
+              </label>
+              <input
+                id="project-search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by project name or collaborator…"
+                aria-label="Search projects by name or collaborator"
+                className="w-full rounded-2xl bg-white/5 border border-white/10 px-5 py-3 text-sm text-ink placeholder:text-muted/50 focus:outline-none focus:border-greenBright/50 transition-colors"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={clearSearch}
+              disabled={!isSearchActive}
+              aria-label="Clear search"
+              className="premium-button rounded-2xl bg-white/5 border border-white/10 px-6 py-3 text-xs font-bold uppercase tracking-widest text-muted hover:text-ink hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Clear
+            </button>
+          </div>
+
           {isLoadingProjectsList && projectsList.length === 0 ? (
             <DashboardGridSkeleton count={4} />
-          ) : projectsList.length > 0 ? (
+          ) : filteredProjectsList.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 animate-in fade-in">
-              {projectsList.map((p) => (
+              {filteredProjectsList.map((p) => (
                 <ProjectCard
                   key={p.projectId}
                   project={p}
@@ -117,6 +164,19 @@ export function ProjectsList({
                   }}
                 />
               ))}
+            </div>
+          ) : projectsList.length > 0 && isSearchActive ? (
+            <div className="glass-card rounded-[2.5rem] p-12 text-center space-y-4">
+              <p className="text-muted text-sm font-medium">
+                No projects match your search. Try a different name or clear your search.
+              </p>
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="premium-button inline-flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-6 py-3 text-xs font-bold uppercase tracking-widest text-muted hover:text-ink hover:bg-white/10 transition-all"
+              >
+                Clear Search
+              </button>
             </div>
           ) : (
             <div className="glass-card rounded-[2.5rem] p-12 text-center">
