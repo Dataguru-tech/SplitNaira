@@ -24,7 +24,23 @@ const mocks = vi.hoisted(() => ({
   mockBuildAllowTokenXdr: vi.fn(),
   mockBuildDisallowTokenXdr: vi.fn(),
   mockSendTransaction: vi.fn(),
-  mockPollTransaction: vi.fn()
+  mockPollTransaction: vi.fn(),
+  mockUseMaintenanceStatus: vi.fn()
+}));
+
+// Default: no maintenance-mode gating for the pre-existing test suites below.
+// Individual tests in the "#934 maintenance-mode write gating" describe
+// block override this per-case.
+beforeEach(() => {
+  mocks.mockUseMaintenanceStatus.mockReturnValue({
+    status: "ok",
+    isWriteDisabled: false,
+    message: undefined
+  });
+});
+
+vi.mock("@/hooks/useMaintenanceStatus", () => ({
+  useMaintenanceStatus: mocks.mockUseMaintenanceStatus
 }));
 
 vi.mock("@/lib/wallet", () => {
@@ -607,6 +623,137 @@ describe("SplitApp distribute flow", () => {
     await loadProject();
     expect(screen.getByRole("button", { name: "Trigger Distribution" })).toHaveProperty("disabled", true);
     expect(screen.getByText("No funds available to distribute")).toBeTruthy();
+  });
+});
+
+// ============================================================
+//  ISSUE #934 — maintenance-mode write-action gating
+//
+//  Demonstrative write-action gate: the "Execute Payout" button (the actual
+//  distribution/write action, inside the distribute confirmation modal in
+//  split-app-legacy.tsx) is disabled whenever useMaintenanceStatus() reports
+//  isWriteDisabled — while the read-only flow of opening the confirmation
+//  modal itself stays available.
+// ============================================================
+
+describe("SplitApp maintenance-mode write gating (#934)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.mockUseWallet.mockReturnValue({
+      wallet: { connected: true, address: "GOWNER123", network: "testnet" },
+      connect: vi.fn(),
+      refresh: vi.fn()
+    });
+    mocks.mockGetWalletState.mockResolvedValue({
+      connected: true,
+      address: "GOWNER123",
+      network: "testnet"
+    });
+    mocks.mockGetAllSplits.mockResolvedValue([]);
+    mocks.mockGetClaimable.mockResolvedValue({ claimed: "0", distributionRound: 0 });
+    mocks.mockGetProjectHistory.mockResolvedValue({ items: [], nextCursor: null });
+    mocks.mockGetTokenAllowlist.mockResolvedValue(baseAllowlist);
+    mocks.mockGetSplit.mockResolvedValue({ ...baseProject, balance: "5000" });
+    mocks.mockSignWithWallet.mockResolvedValue("SIGNED_XDR");
+    mocks.mockBuildDistributeXdr.mockResolvedValue({
+      xdr: "DISTRIBUTE_XDR",
+      metadata: { networkPassphrase: "TESTNET", contractId: "CID" }
+    });
+    mocks.mockSendTransaction.mockResolvedValue({ status: "PENDING", hash: "DIST_TX_HASH" });
+    mocks.mockPollTransaction.mockResolvedValue({ status: "SUCCESS" });
+  });
+
+  it("keeps Execute Payout enabled and callable when status is ok", async () => {
+    mocks.mockUseMaintenanceStatus.mockReturnValue({
+      status: "ok",
+      isWriteDisabled: false,
+      message: undefined
+    });
+
+    const user = await loadProject();
+    await user.click(screen.getByRole("button", { name: "Trigger Distribution" }));
+
+    expect(screen.getByRole("button", { name: "Execute Payout" })).toHaveProperty("disabled", false);
+    expect(screen.queryByText("Unavailable during maintenance")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Execute Payout" }));
+    await waitFor(() => {
+      expect(mocks.mockBuildDistributeXdr).toHaveBeenCalledWith("project_1", "GOWNER123");
+    });
+  });
+
+  it("disables Execute Payout and shows an inline note when status is maintenance", async () => {
+    mocks.mockUseMaintenanceStatus.mockReturnValue({
+      status: "maintenance",
+      isWriteDisabled: true,
+      message: "System is in maintenance mode."
+    });
+
+    const user = await loadProject();
+    // Read-only flow — opening the confirmation modal — still works.
+    await user.click(screen.getByRole("button", { name: "Trigger Distribution" }));
+    expect(screen.getByRole("heading", { name: "Final Confirmation" })).toBeTruthy();
+
+    const payoutButton = screen.getByRole("button", { name: "Execute Payout" });
+    expect(payoutButton).toHaveProperty("disabled", true);
+    expect(screen.getByText("Unavailable during maintenance")).toBeTruthy();
+
+    await user.click(payoutButton);
+    expect(mocks.mockBuildDistributeXdr).not.toHaveBeenCalled();
+  });
+
+  it("does not disable Execute Payout for a merely 'degraded' status", async () => {
+    mocks.mockUseMaintenanceStatus.mockReturnValue({
+      status: "degraded",
+      isWriteDisabled: false,
+      message: "Some services are degraded."
+    });
+
+    const user = await loadProject();
+    await user.click(screen.getByRole("button", { name: "Trigger Distribution" }));
+
+    expect(screen.getByRole("button", { name: "Execute Payout" })).toHaveProperty("disabled", false);
+    expect(screen.queryByText("Unavailable during maintenance")).toBeNull();
+  });
+
+  it("re-enables Execute Payout after leaving maintenance mode", async () => {
+    mocks.mockUseMaintenanceStatus.mockReturnValue({
+      status: "maintenance",
+      isWriteDisabled: true,
+      message: undefined
+    });
+
+    const user = userEvent.setup();
+    const view = renderSplitApp();
+
+    await user.click(screen.getByRole("button", { name: "Manage & Distribute" }));
+    await user.type(screen.getByPlaceholderText(/Enter Project ID/i), "project_1");
+    await user.click(screen.getByRole("button", { name: "Fetch Stats" }));
+    await screen.findByText("Project One");
+
+    await user.click(screen.getByRole("button", { name: "Trigger Distribution" }));
+    expect(screen.getByRole("button", { name: "Execute Payout" })).toHaveProperty("disabled", true);
+    expect(screen.getByText("Unavailable during maintenance")).toBeTruthy();
+
+    // Maintenance clears — simulate the hook's next poll tick reporting "ok".
+    // Force a re-render (as the next poll tick's setState would) so the
+    // SPA-root wrapper re-evaluates useMaintenanceStatus() and threads the
+    // fresh isWriteDisabled value down as a prop.
+    mocks.mockUseMaintenanceStatus.mockReturnValue({
+      status: "ok",
+      isWriteDisabled: false,
+      message: undefined
+    });
+    view.rerender(
+      <ToastProvider>
+        <WalletProvider>
+          <SplitApp />
+        </WalletProvider>
+      </ToastProvider>
+    );
+
+    expect(screen.getByRole("button", { name: "Execute Payout" })).toHaveProperty("disabled", false);
+    expect(screen.queryByText("Unavailable during maintenance")).toBeNull();
   });
 });
 

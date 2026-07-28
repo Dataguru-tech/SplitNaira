@@ -11,6 +11,8 @@ export {
   type WithdrawUnallocatedPayload,
   type WithdrawUnallocatedResponse,
   type ListProjectsParams,
+  type SystemStatus,
+  type SystemStatusResponse,
 } from "./api-client";
 
 import { ApiClient, type ListProjectsParams } from "./api-client";
@@ -153,4 +155,8 @@ export async function getAdminTokenCount(): Promise<{ count: number }> {
 
 export async function getUnallocatedBalance(token: string): Promise<{ token: string; unallocated: string }> {
   return client.getUnallocatedBalance(token);
+}
+
+export async function getSystemStatus(): Promise<SystemStatusResponse> {
+  return client.getSystemStatus();
 }
