@@ -10,6 +10,62 @@ import { getEnv } from "../config/env.js";
 import { logger } from "./logger.js";
 import { AppError, ErrorCode, ErrorType } from "../lib/errors.js";
 import { configureReadCache, getReadCache } from "./read-cache.js";
+import {
+  recordRpcRetryAttempt,
+  recordRpcRetryBackoff,
+  recordRpcRetryOutcome
+} from "./metrics.js";
+
+/**
+ * Issue #836: normalise an RPC error message for log output.
+ *
+ * Defence-in-depth scrubber:
+ * - Drops everything after a newline so multi-line stack traces don't bloat logs.
+ * - Trims trailing whitespace.
+ * - Substitutes known sensitive substrings with `[REDACTED]` markers:
+ *     * `secret_key=...` and `secretkey=...` (any case) \u2014 key=value hints.
+ *     * `xdr=...` followed by base64-ish characters \u2014 unsigned XDR blobs.
+ *     * Raw Stellar **secret seeds** (`S[A-Z2-7]{55}`) \u2014 secret key strings.
+ *     * 64-char hex sequences \u2014 probable private key / signature material.
+ *     * 56-char Stellar **public keys** are NOT redacted: ops need them for
+ *       incident triage. Only opaque secret material is.
+ * - Caps the final length at 512 chars to keep log lines bounded.
+ *
+ * IMPORTANT: callers MUST NOT put private keys, XDR blobs, signed payloads,
+ * or full request/response bodies into the string passed in here. Upstream
+ * RPC errors include only host-level diagnostics so this scrubber does not
+ * need to walk the value; that is the responsibility of every call site.
+ */
+function sanitizeRpcErrorMessage(raw: unknown): string {
+  if (raw === null || raw === undefined) {
+    return "unknown";
+  }
+  const text = typeof raw === "string" ? raw : String(raw);
+  const oneLine = text.split("\n")[0]?.trim() ?? "unknown";
+
+  return oneLine
+    // key=value style hints with any quote form
+    .replace(/secret[_]?key\s*=\s*"?[^\s,"}]+"?/gi, "secret_key=[REDACTED]")
+    // base64 XDR blobs (12+ chars to keep the heuristic tight)
+    .replace(/xdr\s*=\s*"?[A-Za-z0-9+/=]{12,}"?/gi, "xdr=[REDACTED]")
+    // Raw Stellar secret seeds (S + 55 base32 chars)
+    .replace(/\bS[A-Z2-7]{55}\b/g, "[REDACTED_SECRET_SEED]")
+    // 64-char hex strings (likely signing material / private keys)
+    .replace(/\b[0-9a-fA-F]{64}\b/g, "[REDACTED_HEX]")
+    .slice(0, 512);
+}
+
+/**
+ * Issue #836: categorise an error for retry metrics without leaking
+ * sensitive values. Stable categories keep dashboard labels consistent.
+ */
+type RpcRetryOutcome = "success" | "transient_failure" | "timeout" | "validation_error" | "exhausted";
+
+function classifyRpcError(error: unknown): "timeout" | "validation_error" | "transient_failure" {
+  if (error instanceof RpcTimeoutError) return "timeout";
+  if (error instanceof RequestValidationError) return "validation_error";
+  return "transient_failure";
+}
 
 export interface StellarConfig {
   horizonUrl: string;
@@ -44,48 +100,145 @@ export interface RetryOptions {
   maxRetries?: number;
   initialDelayMs?: number;
   timeoutMs?: number;
+  /**
+   * Issue #836: short label identifying the operation being retried
+   * (e.g. `simulateTransaction`, `getEvents`). Plumbed into
+   * structured logs and Prometheus retry metrics so operators can
+   * alert per-operation. Defaults to `unknown` when omitted.
+   */
+  operation?: string;
+  /**
+   * Issue #836: short label identifying the configured RPC endpoint.
+   * Defaults to `rpc` so dashboard labels stay consistent.
+   */
+  endpoint?: string;
 }
 
 const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
   maxRetries: 3,
   initialDelayMs: 1000,
-  timeoutMs: 10000
+  timeoutMs: 10000,
+  operation: "unknown",
+  endpoint: "rpc"
 };
 
+/**
+ * Issue #836: retry-aware RPC call wrapper.
+ *
+ * - Records per-attempt counters and a final-outcome counter per operation/endpoint.
+ * - Emits structured Winston logs on every retry and on terminal outcomes.
+ * - Scrubs error messages before they reach the log pipeline so transaction
+ *   secrets / XDR blobs cannot leak through this code path.
+ *
+ * Backwards compatibility: callers passing only the legacy
+ * `(operation, { maxRetries, initialDelayMs, timeoutMs })` form continue to
+ * work — the new fields default to `operation = "unknown"` and `endpoint = "rpc"`.
+ *
+ * Metric semantics:
+ *   - Each *attempt* (including the first) increments `..._retry_attempts_total`.
+ *   - Each *retry schedule* (not the first attempt) records an additional
+ *     backoff in `..._retry_duration_ms_total`.
+ *   - The **final outcome** of the sequence is recorded exactly once with
+ *     one of: `success`, `validation_error`, `timeout`, `exhausted`.
+ */
 export async function executeWithRetry<T>(
   operation: () => Promise<T>,
   options: RetryOptions = {}
 ): Promise<T> {
-  const { maxRetries, initialDelayMs, timeoutMs } = {
-    ...DEFAULT_RETRY_OPTIONS,
-    ...options
-  };
+  const opts = { ...DEFAULT_RETRY_OPTIONS, ...options };
+  const { maxRetries, initialDelayMs, timeoutMs, operation: operationLabel, endpoint } = opts;
 
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new RpcTimeoutError()), timeoutMs)
-      );
+    // Count every attempt (including the first) up front so the per-attempt
+    // counter is monotonic and matches what dashboards call `attempts_total`.
+    // This call is the sole source of truth for the attempts counter; the
+    // backoff-only helper below must NOT also call into the attempts counter.
+    recordRpcRetryAttempt(operationLabel, endpoint, attempt + 1);
 
-      return await Promise.race([operation(), timeoutPromise]);
+    try {
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new RpcTimeoutError()), timeoutMs);
+      });
+
+      try {
+        const result = await Promise.race([operation(), timeoutPromise]);
+        // Successful attempt \u2014 record the final outcome and return.
+        // Without this, success-rate per operation cannot be computed.
+        recordRpcRetryOutcome(operationLabel, "success", endpoint);
+        return result;
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+      }
     } catch (error) {
       lastError = error as Error;
+      const safeMessage = sanitizeRpcErrorMessage(
+        error instanceof Error ? error.message : error
+      );
+      const errorKind = error instanceof Error ? error.name : typeof error;
 
-      // Don't retry validation errors or timeouts (unless we want to retry on timeout)
+      // Don't retry validation errors \u2014 they will always fail.
       if (error instanceof RequestValidationError) {
+        logger.warn("RPC operation rejected before retrying", {
+          operation: operationLabel,
+          endpoint,
+          attempt: attempt + 1,
+          maxRetries,
+          errorKind,
+          errorMessage: safeMessage,
+        });
+        recordRpcRetryOutcome(operationLabel, "validation_error", endpoint);
         throw error;
       }
 
       if (attempt < maxRetries) {
-        const delay = initialDelayMs * Math.pow(2, attempt);
-        logger.warn("RPC retry", { attempt: attempt + 1, delay, error });
+        const delay = Math.min(
+          initialDelayMs * Math.pow(2, attempt),
+          // 30s cap avoids pathological waits if a caller raises initialDelayMs.
+          30_000,
+        );
+        logger.warn("RPC retry scheduled", {
+          operation: operationLabel,
+          endpoint,
+          attempt: attempt + 1,
+          nextAttempt: attempt + 2,
+          maxRetries,
+          delayMs: delay,
+          errorKind,
+          errorMessage: safeMessage,
+        });
+        // Record scheduler-side backoff so tail-latency is observable. The
+        // attempt itself was already counted at the top of the loop via
+        // `recordRpcRetryAttempt`, so we use the dedicated helper that only
+        // increments `splitnaira_rpc_retry_duration_ms_total` and never
+        // touches the attempts counter.
+        recordRpcRetryBackoff(operationLabel, endpoint, attempt + 1, delay);
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
 
+  // Loop exited without returning \u2014 retries were exhausted.
+  // Classify the terminal outcome using the last captured error.
+  const finalOutcome: RpcRetryOutcome = lastError instanceof RpcTimeoutError
+    ? "timeout"
+    : "exhausted";
+
+  const safeMessage = sanitizeRpcErrorMessage(
+    lastError instanceof Error ? lastError.message : lastError
+  );
+  const errorKind = lastError instanceof Error ? lastError.name : typeof lastError;
+
+  logger.error("RPC retries exhausted", {
+    operation: operationLabel,
+    endpoint,
+    maxRetries,
+    errorKind,
+    errorMessage: safeMessage,
+  });
+  recordRpcRetryOutcome(operationLabel, finalOutcome, endpoint);
   throw lastError || new RpcError("RPC operation failed after retries");
 }
 
@@ -190,7 +343,8 @@ export async function checkSorobanReachability(): Promise<SorobanReachabilitySta
   try {
     sourceAccount = await executeWithRetry(() => server.getAccount(config.simulatorAccount), {
       maxRetries: 1,
-      timeoutMs: 5_000
+      timeoutMs: 5_000,
+      operation: "checkSorobanReachability.getAccount"
     });
   } catch (error) {
     return {
@@ -218,7 +372,8 @@ export async function checkSorobanReachability(): Promise<SorobanReachabilitySta
 
     await executeWithRetry(() => server.simulateTransaction(tx), {
       maxRetries: 1,
-      timeoutMs: 5_000
+      timeoutMs: 5_000,
+      operation: "checkSorobanReachability.simulateProjectExists"
     });
   } catch (error) {
     return {

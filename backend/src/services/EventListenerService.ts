@@ -101,7 +101,9 @@ export async function startEventListenerService() {
       return;
     }
 
-    const latestLedger = await executeWithRetry(() => server.getLatestLedger());
+    const latestLedger = await executeWithRetry(() => server.getLatestLedger(), {
+      operation: "getLatestLedger"
+    });
 
     // Start polling from a small lookback to cover restart gaps, but never more
     // than MAX_CATCHUP_LEDGERS behind the tip.
@@ -215,7 +217,9 @@ export async function pollEvents() {
       ? { filters, startLedger, limit: 100 }
       : { filters, cursor: "", limit: 100 };
 
-    const response = await executeWithRetry(() => server.getEvents(filterOptions));
+    const response = await executeWithRetry(() => server.getEvents(filterOptions), {
+      operation: "getEvents"
+    });
 
     const newRecords: TransactionRecord[] = [];
 
