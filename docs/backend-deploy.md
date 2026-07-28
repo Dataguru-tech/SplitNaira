@@ -131,6 +131,12 @@ CORS_ORIGIN=https://splitnaira.vercel.app,https://app.splitnaira.com,https://spl
 
 If `CORS_ORIGIN` is missing or contains `*` in production the process will refuse to start with a descriptive error.
 
+### Credentials
+
+`Access-Control-Allow-Credentials` is never set (`credentials: false` is passed explicitly to the `cors` middleware in `src/index.ts`). This is intentional, not an oversight: the API authenticates with a bearer token in the `Authorization` header (see `src/middleware/auth-jwt.ts`), never cookies, so the browser has no session cookie to send cross-origin and credentialed CORS is unnecessary attack surface. Do not flip this to `true` without also switching auth to a cookie-based scheme.
+
+The origin allowlist logic lives in `src/config/cors.ts` (`resolveCorsOrigins`) and is exercised directly by `src/__tests__/cors.test.ts`, which covers: an allowed production origin, a disallowed origin, requests with no `Origin` header (non-browser clients), the local development default, and the wildcard-in-production rejection.
+
 ---
 
 ## Structured Logging
