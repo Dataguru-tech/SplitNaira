@@ -16,7 +16,7 @@ export default function NotFound() {
 
       {/* Description */}
       <p className="mt-3 max-w-sm text-[var(--brand-muted)] leading-relaxed">
-        The page you're looking for doesn't exist or has been moved.
+        The page you&apos;re looking for doesn&apos;t exist or has been moved.
         Check the URL or head back to the homepage.
       </p>
 
