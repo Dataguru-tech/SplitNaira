@@ -328,18 +328,31 @@ export interface SorobanReachabilityStatus {
   rpc: {
     ok: boolean;
     message?: string;
+    /** Issue #935: round-trip time for the `getAccount` call, in milliseconds. */
+    latencyMs?: number;
   };
   contract: {
     ok: boolean;
     message?: string;
+    /** Issue #935: round-trip time for the `simulateTransaction` call, in milliseconds. */
+    latencyMs?: number;
   };
 }
 
+/**
+ * Issue #935: probes Soroban RPC reachability and contract simulation,
+ * capturing latency for each call so the readiness endpoint can distinguish
+ * "reachable but slow" (degraded) from "unreachable" (down). Latency is
+ * measured around the full `executeWithRetry` call (including any retries),
+ * since a caller waiting on this endpoint cares about total wall-clock time,
+ * not just the final attempt.
+ */
 export async function checkSorobanReachability(): Promise<SorobanReachabilityStatus> {
   const config = loadStellarConfig();
   const server = getStellarRpcServer();
 
   let sourceAccount;
+  const rpcStart = Date.now();
   try {
     sourceAccount = await executeWithRetry(() => server.getAccount(config.simulatorAccount), {
       maxRetries: 1,
@@ -350,6 +363,7 @@ export async function checkSorobanReachability(): Promise<SorobanReachabilitySta
     return {
       rpc: {
         ok: false,
+        latencyMs: Date.now() - rpcStart,
         message: error instanceof Error ? error.message : "Soroban RPC account lookup failed"
       },
       contract: {
@@ -358,7 +372,9 @@ export async function checkSorobanReachability(): Promise<SorobanReachabilitySta
       }
     };
   }
+  const rpcLatencyMs = Date.now() - rpcStart;
 
+  const contractStart = Date.now();
   try {
     Address.fromString(config.contractId);
     const contract = new Contract(config.contractId);
@@ -377,16 +393,17 @@ export async function checkSorobanReachability(): Promise<SorobanReachabilitySta
     });
   } catch (error) {
     return {
-      rpc: { ok: true },
+      rpc: { ok: true, latencyMs: rpcLatencyMs },
       contract: {
         ok: false,
+        latencyMs: Date.now() - contractStart,
         message: error instanceof Error ? error.message : "Contract simulation failed"
       }
     };
   }
 
   return {
-    rpc: { ok: true },
-    contract: { ok: true }
+    rpc: { ok: true, latencyMs: rpcLatencyMs },
+    contract: { ok: true, latencyMs: Date.now() - contractStart }
   };
 }

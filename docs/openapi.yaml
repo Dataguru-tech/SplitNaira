@@ -143,6 +143,7 @@ components:
           type: string
           enum:
             - ok
+            - degraded
             - not_ready
         uptime:
           type: number
@@ -152,6 +153,70 @@ components:
           description: ISO 8601 timestamp
       required:
         - status
+    ComponentHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - up
+            - degraded
+            - down
+        latencyMs:
+          type: number
+          description: Round-trip latency of the underlying check, in milliseconds
+        message:
+          type: string
+          description: Redacted, human-readable detail. Never contains secrets or raw
+            connection strings.
+      required:
+        - status
+    EnvComponentHealth:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          description: Whether required environment variables are present and valid
+      required:
+        - ok
+    EventListenerComponentHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - stopped
+            - healthy
+            - degraded
+        lastSuccessfulPoll:
+          type: string
+          nullable: true
+          description: ISO 8601 timestamp of the last successful poll, or null
+        consecutiveErrors:
+          type: integer
+          description: Number of consecutive failing polls
+      required:
+        - status
+        - lastSuccessfulPoll
+        - consecutiveErrors
+    ReadinessComponents:
+      type: object
+      properties:
+        env:
+          $ref: "#/components/schemas/EnvComponentHealth"
+        db:
+          $ref: "#/components/schemas/ComponentHealth"
+        rpc:
+          $ref: "#/components/schemas/ComponentHealth"
+        contract:
+          $ref: "#/components/schemas/ComponentHealth"
+        eventListener:
+          $ref: "#/components/schemas/EventListenerComponentHealth"
+      required:
+        - env
+        - db
+        - rpc
+        - contract
     ReadinessResponse:
       type: object
       properties:
@@ -159,7 +224,14 @@ components:
           type: string
           enum:
             - ready
+            - degraded
             - not_ready
+          description: "Issue #935 status/status-code policy: \"ready\" -> 200 (all
+            dependencies up); \"degraded\" -> 200 (service still usable, but at
+            least one dependency is slow or in a non-fatal failure state -
+            investigate, don't page); \"not_ready\" -> 503 (env invalid or a
+            dependency is fully down, unchanged from the legacy binary
+            contract)."
         error:
           type: string
           description: Error code if not ready
@@ -174,6 +246,8 @@ components:
         requestId:
           type: string
           description: Request ID for tracing
+        components:
+          $ref: "#/components/schemas/ReadinessComponents"
       required:
         - status
     MainnetReadinessResponse:
@@ -2913,11 +2987,14 @@ paths:
   /health:
     get:
       summary: Get readiness status (alias for /health/ready)
+      description: 'Alias for /health/ready. Returns 200 for both "ready" and
+        "degraded" (service still usable); 503 only for "not_ready" (Issue
+        #935).'
       tags:
         - Health
       responses:
         "200":
-          description: Server is ready to accept traffic
+          description: Server is ready to accept traffic, or degraded but still usable
           content:
             application/json:
               schema:
@@ -2950,24 +3027,23 @@ paths:
   /health/ready:
     get:
       summary: Readiness check (Kubernetes compatible)
+      description: 'Issue #935: returns 200 with status "ready" (all dependencies up)
+        or "degraded" (usable, but db/rpc/contract/eventListener is slow or
+        non-fatally impaired); returns 503 with status "not_ready" only when env
+        is invalid or a dependency is fully down. See
+        docs/runbooks/observability.md for the on-call interpretation of each
+        state.'
       tags:
         - Health
       responses:
         "200":
-          description: Server is ready to accept traffic
+          description: Server is ready to accept traffic, or degraded but still usable
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    enum:
-                      - ready
-                required:
-                  - status
+                $ref: "#/components/schemas/ReadinessResponse"
         "503":
-          description: Server is not ready (missing configuration)
+          description: Server is not ready (missing configuration or a dependency is down)
           content:
             application/json:
               schema:

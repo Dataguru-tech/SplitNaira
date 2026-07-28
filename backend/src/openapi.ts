@@ -1175,20 +1175,72 @@ registry.registerPath({
 const HealthResponseSchema = registry.register(
   "HealthResponse",
   z.object({
-    status: z.enum(["ok", "not_ready"]),
+    status: z.enum(["ok", "degraded", "not_ready"]),
     uptime: z.number().optional().describe("Server uptime in seconds"),
     timestamp: z.string().optional().describe("ISO 8601 timestamp"),
+  })
+);
+
+// Issue #935: per-dependency 3-way status. A dependency is "up" if it
+// responds within its configured latency threshold, "degraded" if it
+// responds successfully but slower than that threshold, and "down" if it
+// errors or times out outright. Thresholds are configurable via
+// HEALTH_DB_DEGRADED_LATENCY_MS (default 500ms) and
+// HEALTH_RPC_DEGRADED_LATENCY_MS (default 1500ms, applied to both the
+// Soroban RPC and contract-simulation checks).
+const ComponentHealthSchema = registry.register(
+  "ComponentHealth",
+  z.object({
+    status: z.enum(["up", "degraded", "down"]),
+    latencyMs: z.number().optional().describe("Round-trip latency of the underlying check, in milliseconds"),
+    message: z
+      .string()
+      .optional()
+      .describe("Redacted, human-readable detail. Never contains secrets or raw connection strings."),
+  })
+);
+
+const EnvComponentHealthSchema = registry.register(
+  "EnvComponentHealth",
+  z.object({
+    ok: z.boolean().describe("Whether required environment variables are present and valid"),
+  })
+);
+
+const EventListenerComponentHealthSchema = registry.register(
+  "EventListenerComponentHealth",
+  z.object({
+    status: z.enum(["stopped", "healthy", "degraded"]),
+    lastSuccessfulPoll: z.string().nullable().describe("ISO 8601 timestamp of the last successful poll, or null"),
+    consecutiveErrors: z.number().int().describe("Number of consecutive failing polls"),
+  })
+);
+
+const ReadinessComponentsSchema = registry.register(
+  "ReadinessComponents",
+  z.object({
+    env: EnvComponentHealthSchema,
+    db: ComponentHealthSchema,
+    rpc: ComponentHealthSchema,
+    contract: ComponentHealthSchema,
+    eventListener: EventListenerComponentHealthSchema.optional(),
   })
 );
 
 const ReadinessResponseSchema = registry.register(
   "ReadinessResponse",
   z.object({
-    status: z.enum(["ready", "not_ready"]),
+    status: z.enum(["ready", "degraded", "not_ready"]).describe(
+      "Issue #935 status/status-code policy: \"ready\" -> 200 (all dependencies up); " +
+      "\"degraded\" -> 200 (service still usable, but at least one dependency is slow " +
+      "or in a non-fatal failure state - investigate, don't page); \"not_ready\" -> 503 " +
+      "(env invalid or a dependency is fully down, unchanged from the legacy binary contract)."
+    ),
     error: z.string().optional().describe("Error code if not ready"),
     message: z.string().optional().describe("Error message if not ready"),
     issues: z.array(z.string()).optional().describe("List of configuration issues"),
     requestId: z.string().optional().describe("Request ID for tracing"),
+    components: ReadinessComponentsSchema.optional(),
   })
 );
 
@@ -1196,10 +1248,13 @@ registry.registerPath({
   method: "get",
   path: "/health",
   summary: "Get readiness status (alias for /health/ready)",
+  description:
+    "Alias for /health/ready. Returns 200 for both \"ready\" and \"degraded\" (service still usable); " +
+    "503 only for \"not_ready\" (Issue #935).",
   tags: ["Health"],
   responses: {
     200: {
-      description: "Server is ready to accept traffic",
+      description: "Server is ready to accept traffic, or degraded but still usable",
       content: {
         "application/json": {
           schema: ReadinessResponseSchema,
@@ -1240,20 +1295,23 @@ registry.registerPath({
   method: "get",
   path: "/health/ready",
   summary: "Readiness check (Kubernetes compatible)",
+  description:
+    "Issue #935: returns 200 with status \"ready\" (all dependencies up) or \"degraded\" " +
+    "(usable, but db/rpc/contract/eventListener is slow or non-fatally impaired); " +
+    "returns 503 with status \"not_ready\" only when env is invalid or a dependency is " +
+    "fully down. See docs/runbooks/observability.md for the on-call interpretation of each state.",
   tags: ["Health"],
   responses: {
     200: {
-      description: "Server is ready to accept traffic",
+      description: "Server is ready to accept traffic, or degraded but still usable",
       content: {
         "application/json": {
-          schema: z.object({
-            status: z.literal("ready"),
-          }),
+          schema: ReadinessResponseSchema,
         },
       },
     },
     503: {
-      description: "Server is not ready (missing configuration)",
+      description: "Server is not ready (missing configuration or a dependency is down)",
       content: {
         "application/json": {
           schema: ReadinessResponseSchema,
