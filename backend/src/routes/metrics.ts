@@ -8,6 +8,10 @@ import {
   getDistributionsExecutedTotal,
   getDepositsReceivedTotal,
   getSseConnectionsActive,
+  getRpcRetryAttemptsTotal,
+  getRpcRetryDurationMsTotal,
+  getRpcRetryMaxAttemptsReachedTotal,
+  getRpcRetrySnapshots,
 } from "../services/metrics.js";
 
 export const metricsRouter = Router();
@@ -79,6 +83,28 @@ lines.push(`deposits_received_total ${getDepositsReceivedTotal()}`);
 lines.push("# HELP sse_connections_active Active SSE connections.");
 lines.push("# TYPE sse_connections_active gauge");
 lines.push(`sse_connections_active ${getSseConnectionsActive()}`);
+
+  // Issue #836: RPC retry observability series.
+  lines.push("# HELP splitnaira_rpc_retry_attempts_total Total RPC retry attempts, including first try, labelled by operation and endpoint.");
+  lines.push("# TYPE splitnaira_rpc_retry_attempts_total counter");
+  lines.push(`splitnaira_rpc_retry_attempts_total ${getRpcRetryAttemptsTotal()}`);
+
+  lines.push("# HELP splitnaira_rpc_retry_max_attempts_reached_total Total times the RPC retry budget was fully consumed without success.");
+  lines.push("# TYPE splitnaira_rpc_retry_max_attempts_reached_total counter");
+  lines.push(`splitnaira_rpc_retry_max_attempts_reached_total ${getRpcRetryMaxAttemptsReachedTotal()}`);
+
+  lines.push("# HELP splitnaira_rpc_retry_duration_ms_total Cumulative delay, in milliseconds, spent sleeping between RPC retry attempts.");
+  lines.push("# TYPE splitnaira_rpc_retry_duration_ms_total counter");
+  lines.push(`splitnaira_rpc_retry_duration_ms_total ${getRpcRetryDurationMsTotal()}`);
+
+  lines.push("# HELP splitnaira_rpc_retry_outcomes_total Final outcome of RPC retry sequences by operation, endpoint, and outcome label.");
+  lines.push("# TYPE splitnaira_rpc_retry_outcomes_total counter");
+  for (const { operation, outcome, endpoint, count } of getRpcRetrySnapshots()) {
+    if (outcome === "attempt") continue; // exposed via the aggregate counter above
+    lines.push(
+      `splitnaira_rpc_retry_outcomes_total{operation=${quoteLabelValue(operation)},outcome=${quoteLabelValue(outcome)},endpoint=${quoteLabelValue(endpoint)}} ${count}`,
+    );
+  }
 
   return lines.join("\n");
 }

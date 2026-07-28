@@ -74,18 +74,34 @@ Source: No dedicated DB metrics are currently exported. The health endpoint (`ro
 
 ## 4. Stellar RPC / Soroban Metrics
 
-Source: Health endpoint runs `checkSorobanReachability()` and `checkContractHealth()`. No Prometheus metrics are exposed for RPC performance.
+Source: Issue #836 wired `executeWithRetry` to record structured metrics.
+Health endpoint runs `checkSorobanReachability()` and `checkContractHealth()`.
 
 | Metric | Type | Labels | Owner | Alert Threshold | Status |
 |--------|------|--------|-------|----------------|--------|
+| `splitnaira_rpc_retry_attempts_total` | counter | — | Backend | Sustained > 2x baseline | ✅ Live (Issue #836) |
+| `splitnaira_rpc_retry_max_attempts_reached_total` | counter | — | Backend | Any >0 in 5m | ✅ Live (Issue #836) |
+| `splitnaira_rpc_retry_duration_ms_total` | counter | — | Backend | Increase > 60s/15m | ✅ Live (Issue #836) |
+| `splitnaira_rpc_retry_outcomes_total` | counter | `operation`, `outcome`, `endpoint` | Backend | Timeouts / exhausted >0 | ✅ Live (Issue #836) |
 | `rpc_request_duration_seconds` | histogram | `endpoint` | Backend | P99 > 5s | ❌ Missing |
-| `rpc_request_errors_total` | counter | `endpoint`, `code` | Backend | Any >0 | ❌ Missing |
+| `rpc_request_errors_total` | counter | `endpoint`, `code` | Backend | Any >0 | ✅ Partial (Issue #836 covers retry outcomes) |
 | `rpc_simulation_latency_seconds` | histogram | — | Backend | P99 > 3s | ❌ Missing |
 | `contract_call_duration_seconds` | histogram | `method` | Backend | P99 > 5s | ❌ Missing |
 
 ### Existing Health Checks
 - `/health/ready` checks Soroban RPC reachability and contract simulation.
 - Failures set component status to `not_ready` and return 503.
+
+### Issue #836: How retry metrics are recorded
+- Per-attempt: `recordRpcRetryAttempt(operation, endpoint, attempt, delayMs)`
+  increments `splitnaira_rpc_retry_attempts_total` and, when `delayMs > 0`,
+  `splitnaira_rpc_retry_duration_ms_total`.
+- Per-final-outcome: `recordRpcRetryOutcome(operation, outcome, endpoint)`
+  increments `splitnaira_rpc_retry_outcomes_total{operation, outcome, endpoint}`
+  and bumps `splitnaira_rpc_retry_max_attempts_reached_total` when outcome is
+  `exhausted`.
+- Outcomes: `success`, `validation_error`, `timeout`, `exhausted`,
+  `transient_failure` (reserved for future behaviour changes).
 
 ### TODO (follow-up)
 - Export RPC call timings from `lib/soroban-transaction.ts` and `services/contract.ts`.

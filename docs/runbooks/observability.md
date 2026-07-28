@@ -37,6 +37,10 @@ Exposed series:
 - `distributions_executed_total` — total distributions executed
 - `deposits_received_total` — total deposits received
 - `sse_connections_active` — active SSE connections
+- `splitnaira_rpc_retry_attempts_total` — total RPC retry attempts (Issue #836)
+- `splitnaira_rpc_retry_max_attempts_reached_total` — times the retry budget was fully consumed without success (Issue #836)
+- `splitnaira_rpc_retry_duration_ms_total` — cumulative sleeper delay between RPC retry attempts in milliseconds (Issue #836)
+- `splitnaira_rpc_retry_outcomes_total{operation,outcome,endpoint}` — final outcome of RPC retry sequences labelled by operation and endpoint (Issue #836)
 
 Contract-level telemetry is also available through on-chain event topics emitted by the SplitNaira contract. Analytics consumers should combine backend metrics with contract event streams for richer Insights.
 
@@ -75,8 +79,54 @@ When `BACKEND_METRICS_URL` is also configured, the smoke check validates the ana
 | Smoke check failures | Roll back Render deploy; smoke check does not auto-rollback |
 | Correlation header change | Revert middleware commit; clients using either header remain compatible |
 
+## RPC Retry Observability (Issue #836)
+
+Every call into `executeWithRetry` carries two labels: `operation` (e.g.
+`simulateTransaction`, `getEvents`) and `endpoint` (e.g. `rpc`). The helper
+emits the following structured logs (`LOG_FORMAT=json` recommended for
+ingestion):
+
+| Log | Level | When |
+|-----|-------|------|
+| `RPC retry scheduled` | warn | Each retryable failure before the next attempt |
+| `RPC operation rejected before retrying` | warn | `RequestValidationError` short-circuits the helper |
+| `RPC retries exhausted` | error | Final attempt failed after the full retry budget |
+
+Log fields (stable schema):
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `operation` | string | Short label identifying the RPC call (`simulateTransaction`, `getEvents`, ...) |
+| `endpoint` | string | Host label, defaults to `rpc` |
+| `attempt` | number | 1-based attempt number for this log line |
+| `nextAttempt` | number | The attempt number that will run after the scheduled backoff (omitted for terminal lines) |
+| `maxRetries` | number | The configured retry budget for the call |
+| `delayMs` | number | The backoff that will be slept before the next attempt |
+| `errorKind` | string | The `name` of the captured error class |
+| `errorMessage` | string | Sanitized first-line of the error message (no XDR, no `secret_key=...`, no stack) |
+
+### Alert signals
+
+Recommended Prometheus alerts:
+
+| Signal | Expression | Rationale |
+|--------|-----------|-----------|
+| Retry budget exhausted for any operation | `rate(splitnaira_rpc_retry_max_attempts_reached_total[5m]) > 0` | Burning the full budget means callers will start seeing 502/504 responses |
+| Sustained `simulateTransaction` timeouts | `sum by (endpoint) (rate(splitnaira_rpc_retry_outcomes_total{outcome="timeout"}[5m])) > 0.1` | Simulation latency past `timeoutMs` means RPC is degraded for write paths |
+| Cumulative retry sleep growing without success | `increase(splitnaira_rpc_retry_duration_ms_total[15m]) > 60000` | Backoffs are stacking, suggesting the RPC is flapping |
+| Validation rejections from RPC | `sum by (operation) (rate(splitnaira_rpc_retry_outcomes_total{outcome="validation_error"}[5m])) > 0` | Indicates a client is sending payloads the RPC refuses — usually a contract arg drift |
+
+### Secret-hygiene guarantees
+
+`executeWithRetry` does not log full `Error` objects; it logs only
+`errorKind` and the first line of `errorMessage`. The helper additionally
+scrubs `secret_key` and `xdr=` substrings from the message before logging.
+Reviewers should reject any PR that introduces `console.log(error)` or
+`logger.warn({ error })` in retry paths, because those bypass the sanitizer.
+
 ## Related
 
 - [CI/CD reliability](../cicd-reliability.md)
 - [Backend deploy](../backend-deploy.md)
 - [Ops deployment & rollback](./ops-deployment-rollback.md)
+- [Metrics inventory](../metrics-inventory.md)
