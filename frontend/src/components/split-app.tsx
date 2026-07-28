@@ -7,6 +7,8 @@ import { useTranslations } from "next-intl";
 import { SplitApp as SplitAppLegacy } from "./split-app-legacy";
 import { useFocusTrap } from "./useFocusTrap";
 import useLockBodyScroll from "./useLockBodyScroll";
+import { useMaintenanceStatus } from "@/hooks/useMaintenanceStatus";
+import { MaintenanceBanner } from "./MaintenanceBanner";
 
 const MODAL_SELECTORS = [
   "[role='dialog'][aria-modal='true']",
@@ -28,6 +30,12 @@ export function SplitApp() {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeModalRef = useRef<HTMLElement | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Single poll site for backend maintenance/degraded status (#934). The
+  // result is threaded down to SplitAppLegacy via a prop rather than having
+  // individual components poll independently.
+  const { status: maintenanceStatus, isWriteDisabled, message: maintenanceMessage } =
+    useMaintenanceStatus();
 
   const copy = useMemo(
     () =>
@@ -126,7 +134,15 @@ export function SplitApp() {
 
   return (
     <div ref={rootRef}>
-      <SplitAppLegacy onLoadingFlagsChange={onLoadingFlagsChange} />
+      <MaintenanceBanner
+        status={maintenanceStatus}
+        message={maintenanceMessage}
+        className="mx-auto mb-6 w-full max-w-4xl"
+      />
+      <SplitAppLegacy
+        onLoadingFlagsChange={onLoadingFlagsChange}
+        isWriteDisabled={isWriteDisabled}
+      />
     </div>
   );
 }

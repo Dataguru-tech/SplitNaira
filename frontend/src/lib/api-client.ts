@@ -90,6 +90,36 @@ export interface UnallocatedBalanceState {
   unallocated: string;
 }
 
+/**
+ * Simplified frontend-side system status, derived from the backend health
+ * endpoint response.
+ *
+ * ── ASSUMED BACKEND CONTRACT (not yet merged upstream) ──────────────────────
+ * As of this writing, `GET /health` (aliased `/health/ready`) returns
+ * `{ status: "ready" | "not_ready", error?, message?, issues?, requestId? }`
+ * with a 503 on `not_ready`. A parallel, separate piece of work is adding a
+ * three-way `"ready" | "degraded" | "not_ready"` status (200 for
+ * ready/degraded, 503 for not_ready) for a dependency-level breakdown. That
+ * work is unmerged, so its exact final shape is unknown here — this is a
+ * best-guess, tolerant mapping, not a byte-for-byte match to what the
+ * backend ultimately ships:
+ *   - "ready" / "ok"        -> "ok"          (fully operational)
+ *   - "degraded"            -> "degraded"    (banner only; reads AND writes
+ *                                             still work)
+ *   - "not_ready" / "maintenance" / an unrecognized body on a 503
+ *                           -> "maintenance" (banner + writes disabled;
+ *                                             reads keep working)
+ * Anything else (network error, timeout, unparseable JSON, unexpected
+ * shape on a 2xx) fails open to "ok" so a broken health check never itself
+ * breaks the app.
+ */
+export type SystemStatus = "ok" | "degraded" | "maintenance";
+
+export interface SystemStatusResponse {
+  status: SystemStatus;
+  message?: string;
+}
+
 interface BuildSplitResponse {
   xdr: string;
   metadata: {
@@ -484,6 +514,66 @@ export class ApiClient {
       "Failed to fetch unallocated balance",
     );
   }
+
+  /**
+   * Fetches the backend's health/status endpoint and maps it to the
+   * frontend's simplified `SystemStatus`. Never throws — a network error,
+   * timeout, or unparseable response resolves to `{ status: "ok" }` (fail
+   * open) rather than surfacing a fake maintenance banner because the
+   * health check itself is broken. See `SystemStatusResponse` above for the
+   * assumed backend contract this maps from.
+   */
+  async getSystemStatus(): Promise<SystemStatusResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5_000);
+    try {
+      const response = await fetch(`${this.baseUrl}/health`, {
+        signal: controller.signal,
+      });
+      const body = (await response.json().catch(() => null)) as unknown;
+      return normalizeSystemStatus(body, response.status);
+    } catch {
+      // Network error, timeout, or abort — fail open rather than block the app.
+      return { status: "ok" };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+/**
+ * Maps a raw `/health` response body (of whichever shape the backend
+ * happens to send) to the frontend's simplified `SystemStatus`. Tolerant of
+ * a missing/unexpected shape — falls open to "ok" unless the HTTP status
+ * itself signals an outage (503).
+ */
+function normalizeSystemStatus(
+  body: unknown,
+  httpStatus: number,
+): SystemStatusResponse {
+  if (!body || typeof body !== "object") {
+    return httpStatus === 503 ? { status: "maintenance" } : { status: "ok" };
+  }
+
+  const b = body as Record<string, unknown>;
+  const rawStatus =
+    typeof b.status === "string" ? b.status.toLowerCase() : "";
+  const message = typeof b.message === "string" ? b.message : undefined;
+
+  if (rawStatus === "ready" || rawStatus === "ok") {
+    return { status: "ok", message };
+  }
+  if (rawStatus === "degraded") {
+    return { status: "degraded", message };
+  }
+  if (rawStatus === "not_ready" || rawStatus === "maintenance") {
+    return { status: "maintenance", message };
+  }
+
+  // Unrecognized status string: defer to the HTTP status code.
+  return httpStatus === 503
+    ? { status: "maintenance", message }
+    : { status: "ok", message };
 }
 
 function mapProjectToCamelCase(p: Record<string, unknown>): SplitProject {

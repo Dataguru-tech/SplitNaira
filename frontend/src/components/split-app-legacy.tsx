@@ -112,8 +112,15 @@ const SEEDED_PROJECT_IDS = [
 
 export function SplitApp({
   onLoadingFlagsChange,
+  isWriteDisabled = false,
 }: {
   onLoadingFlagsChange?: (flags: LoadingBarFlags) => void;
+  /**
+   * True when the backend is reporting maintenance mode (#934). Gates the
+   * "Execute Payout" distribution action as a demonstrative write-action
+   * lock — read-only flows (viewing projects, history, etc.) stay open.
+   */
+  isWriteDisabled?: boolean;
 } = {}) {
   const { wallet, connect, refresh } = useWallet();
 
@@ -1272,7 +1279,7 @@ export function SplitApp({
             <div className="mt-10 flex flex-col gap-4">
               <button
                 onClick={onDistribute}
-                disabled={sorobanSplitFlowBusy}
+                disabled={sorobanSplitFlowBusy || isWriteDisabled}
                 className="premium-button w-full rounded-2xl bg-greenBright py-5 text-xs font-black uppercase tracking-[0.3em] text-[#0a0a09]"
               >
                 {isSubmitting
@@ -1281,6 +1288,11 @@ export function SplitApp({
                     : "Signing & submitting…"
                   : "Execute Payout"}
               </button>
+              {isWriteDisabled && (
+                <p className="text-center text-[10px] font-bold uppercase tracking-widest text-red-400">
+                  Unavailable during maintenance
+                </p>
+              )}
               <button
                 onClick={() => setShowDistributeModal(false)}
                 disabled={sorobanSplitFlowBusy}
