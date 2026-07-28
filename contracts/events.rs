@@ -35,6 +35,48 @@ impl ProjectCreated {
     }
 }
 
+
+/// Returns a Vec of two collaborators splitting 50/50.
+fn two_collabs(env: &Env) -> Vec<Collaborator> {
+    let a = Address::generate(env);
+    let b = Address::generate(env);
+    vec![
+        env,
+        Collaborator {
+            address: a,
+            alias: String::from_str(env, "A"),
+            basis_points: 5000,
+        },
+        Collaborator {
+            address: b,
+            alias: String::from_str(env, "B"),
+            basis_points: 5000,
+        },
+    ]
+}
+
+/// Creates a project with a registered token and returns (client, owner, token).
+fn setup_project<'a>(
+    env: &'a Env,
+    project_id: &'a Symbol,
+) -> (SplitNairaContractClient<'a>, Address, Address) {
+    let (client, _) = make_client(env);
+    let token_admin = Address::generate(env);
+    let token = env.register_stellar_asset_contract(token_admin);
+    let owner = Address::generate(env);
+    let collabs = two_collabs(env);
+
+    client.create_project(
+        &owner,
+        project_id,
+        &String::from_str(env, "Test Project"),
+        &String::from_str(env, "music"),
+        &token,
+        &collabs,
+    );
+    (client, owner, token)
+}
+
 impl Publishable for ProjectCreated {
     fn publish(&self, env: &Env) {
         env.events().publish(
@@ -62,6 +104,48 @@ impl ProjectLocked {
     pub fn new(project_id: Symbol) -> Self {
         Self { project_id }
     }
+}
+
+
+/// Returns a Vec of two collaborators splitting 50/50.
+fn two_collabs(env: &Env) -> Vec<Collaborator> {
+    let a = Address::generate(env);
+    let b = Address::generate(env);
+    vec![
+        env,
+        Collaborator {
+            address: a,
+            alias: String::from_str(env, "A"),
+            basis_points: 5000,
+        },
+        Collaborator {
+            address: b,
+            alias: String::from_str(env, "B"),
+            basis_points: 5000,
+        },
+    ]
+}
+
+/// Creates a project with a registered token and returns (client, owner, token).
+fn setup_project<'a>(
+    env: &'a Env,
+    project_id: &'a Symbol,
+) -> (SplitNairaContractClient<'a>, Address, Address) {
+    let (client, _) = make_client(env);
+    let token_admin = Address::generate(env);
+    let token = env.register_stellar_asset_contract(token_admin);
+    let owner = Address::generate(env);
+    let collabs = two_collabs(env);
+
+    client.create_project(
+        &owner,
+        project_id,
+        &String::from_str(env, "Test Project"),
+        &String::from_str(env, "music"),
+        &token,
+        &collabs,
+    );
+    (client, owner, token)
 }
 
 impl Publishable for ProjectLocked {

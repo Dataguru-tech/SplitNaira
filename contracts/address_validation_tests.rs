@@ -60,6 +60,21 @@ fn create_project_with_valid_addresses_succeeds() {
     assert_eq!(client.get_project_count(), 1);
 }
 
+
+use crate::{errors::SplitError, Collaborator, SplitNairaContract, SplitNairaContractClient};
+use soroban_sdk::{testutils::Address as _, vec, Address, Env, String, Symbol, Vec};
+
+fn setup() -> (Env, SplitNairaContractClient, Address) {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(token_admin);
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+    (env, client, token)
+}
+
 #[test]
 fn create_project_with_three_collaborators_succeeds() {
     let (env, client, token) = setup();

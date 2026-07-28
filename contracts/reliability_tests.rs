@@ -27,6 +27,21 @@ fn make_client(env: &Env) -> (SplitNairaContractClient, Address) {
     (client, contract_id)
 }
 
+
+use crate::{errors::SplitError, Collaborator, SplitNairaContract, SplitNairaContractClient};
+use soroban_sdk::{testutils::Address as _, vec, Address, Env, String, Symbol, Vec};
+
+fn setup() -> (Env, SplitNairaContractClient, Address) {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let token_admin = Address::generate(&env);
+    let token = env.register_stellar_asset_contract(token_admin);
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+    (env, client, token)
+}
+
 /// Returns a Vec of two collaborators splitting 50/50.
 fn two_collabs(env: &Env) -> Vec<Collaborator> {
     let a = Address::generate(env);
