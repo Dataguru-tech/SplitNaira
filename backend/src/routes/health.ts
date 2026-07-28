@@ -73,13 +73,108 @@ healthRouter.get("/startup", (_req, res) => {
  */
 healthRouter.get("/ready", handleReadiness);
 
+// ─── Issue #935: degraded-mode health response contract ────────────────────
+//
+// Status code / overall-status policy (documented in docs/runbooks/observability.md):
+//   - "ready"     -> 200. Every dependency is "up" (or "degraded" event
+//                    listener/component logic below doesn't apply).
+//   - "degraded"  -> 200. The service is still usable - every hard-failure
+//                    check below passed - but at least one dependency
+//                    (db/rpc/contract/eventListener) is slow or in a
+//                    non-fatal failure state. Callers should keep routing
+//                    traffic here; on-call should investigate but this is
+//                    not a page-worthy outage on its own.
+//   - "not_ready" -> 503. Unchanged from the previous binary contract: env
+//                    invalid, or db/rpc/contract fully unreachable.
+//
+// A dependency is "up" if it responds successfully within its configured
+// latency threshold, "degraded" if it responds successfully but slower than
+// that threshold, and "down" if it errors or times out entirely. `env` has
+// no natural degraded state (config is either valid or it isn't), so it
+// stays a simple `{ ok: boolean }`.
+
+/** Per-dependency 3-way health status, mirroring EventListenerService's ServiceStatus naming. */
+export type ComponentStatus = "up" | "degraded" | "down";
+
+export interface ComponentHealth {
+  status: ComponentStatus;
+  /** Round-trip latency for the underlying check, in milliseconds, when available. */
+  latencyMs?: number;
+  /** Redacted, human-readable detail. Never contains secrets or raw connection strings. */
+  message?: string;
+}
+
+const DEFAULT_DB_DEGRADED_LATENCY_MS = 500;
+const DEFAULT_RPC_DEGRADED_LATENCY_MS = 1500;
+
+/**
+ * Reads a positive-integer latency threshold from an env var, falling back
+ * to `fallback` when unset or invalid. Read fresh on every request (rather
+ * than cached at module load) so it stays in step with `config/env.js`'s
+ * own "read process.env directly, no restart required for test overrides"
+ * convention and so tests can override it per-case.
+ */
+function readLatencyThresholdMs(envVar: string, fallback: number): number {
+  const raw = process.env[envVar];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getDbDegradedLatencyMs(): number {
+  return readLatencyThresholdMs("HEALTH_DB_DEGRADED_LATENCY_MS", DEFAULT_DB_DEGRADED_LATENCY_MS);
+}
+
+function getRpcDegradedLatencyMs(): number {
+  return readLatencyThresholdMs("HEALTH_RPC_DEGRADED_LATENCY_MS", DEFAULT_RPC_DEGRADED_LATENCY_MS);
+}
+
+/**
+ * Issue #935: dependency-level messages in the readiness response are
+ * public-ish (consumed by orchestrators, and reachable by anyone who can hit
+ * the endpoint), so any secret that a driver/RPC error message might echo
+ * back must be scrubbed before it lands in `components.*.message`.
+ *
+ * Redacts:
+ *  - Full literal values of DATABASE_URL / SOROBAN_RPC_URL / HORIZON_URL /
+ *    PAYMENTS_ADMIN_API_KEY, if the underlying error message happens to
+ *    embed them verbatim (e.g. a pg connection error echoing the DSN).
+ *  - Any `scheme://user:pass@host` credential segment, as a defence-in-depth
+ *    fallback for connection strings not caught by the exact-value check
+ *    above (e.g. a differently-cased or partially-normalised URL).
+ */
+function redactSecrets(message: string): string {
+  let redacted = message;
+
+  const literalSecrets = [
+    process.env.DATABASE_URL,
+    process.env.SOROBAN_RPC_URL,
+    process.env.HORIZON_URL,
+    process.env.PAYMENTS_ADMIN_API_KEY
+  ].filter((value): value is string => typeof value === "string" && value.length > 0);
+
+  for (const secret of literalSecrets) {
+    redacted = redacted.split(secret).join("[REDACTED]");
+  }
+
+  // Generic connection-string credential pattern: scheme://user:pass@host
+  redacted = redacted.replace(/([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@\s/]+@/g, "$1[REDACTED]@");
+
+  return redacted;
+}
+
 async function handleReadiness(_req: unknown, res: Response, next: NextFunction) {
   const requestId = res.locals.requestId;
-  const components = {
+  const components: {
+    env: { ok: boolean };
+    db: ComponentHealth;
+    rpc: ComponentHealth;
+    contract: ComponentHealth;
+  } = {
     env: { ok: true },
-    db: { ok: false, message: "" },
-    rpc: { ok: false, message: "" },
-    contract: { ok: false, message: "" }
+    db: { status: "down" },
+    rpc: { status: "down" },
+    contract: { status: "down" }
   };
 
   if (shuttingDown) {
@@ -121,6 +216,8 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
     return;
   }
 
+  const dbDegradedLatencyMs = getDbDegradedLatencyMs();
+
   try {
     const ds = getDataSource();
     if (!ds.isInitialized) {
@@ -128,26 +225,30 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
     }
 
     try {
+      const dbStart = Date.now();
       const rows = await ds.query('SELECT 1 AS one');
-      components.db = { ok: true, message: 'query_ok', rows: Array.isArray(rows) ? rows.length : undefined };
+      const latencyMs = Date.now() - dbStart;
+      components.db = {
+        status: latencyMs > dbDegradedLatencyMs ? "degraded" : "up",
+        latencyMs,
+        message: Array.isArray(rows) ? "query_ok" : "query_ok_unexpected_shape"
+      };
     } catch (queryErr) {
       const message = queryErr instanceof Error ? queryErr.message : String(queryErr);
-      components.db = { ok: false, message: `query_failed: ${message}` };
+      components.db = { status: "down", message: redactSecrets(`query_failed: ${message}`) };
       res.status(503).json({
         status: "not_ready",
         error: "database_unavailable",
         message: "Database query failed; check DATABASE_URL and connectivity.",
         components,
         requestId,
-        details: { error: message }
+        details: { error: redactSecrets(message) }
       });
       return;
     }
   } catch (dbError) {
-    components.db = {
-      ok: false,
-      message: dbError instanceof Error ? dbError.message : "Database connection is not available."
-    };
+    const message = dbError instanceof Error ? dbError.message : "Database connection is not available.";
+    components.db = { status: "down", message: redactSecrets(message) };
     res.status(503).json({
       status: "not_ready",
       error: "database_unavailable",
@@ -159,13 +260,34 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
     return;
   }
 
+  const rpcDegradedLatencyMs = getRpcDegradedLatencyMs();
+
   try {
     const soroban = await checkSorobanReachability();
-    components.rpc = { ok: soroban.rpc.ok, message: soroban.rpc.message ?? "reachable" };
-    components.contract = {
-      ok: soroban.contract.ok,
-      message: soroban.contract.message ?? "simulation_ok"
-    };
+
+    components.rpc = soroban.rpc.ok
+      ? {
+          status: (soroban.rpc.latencyMs ?? 0) > rpcDegradedLatencyMs ? "degraded" : "up",
+          latencyMs: soroban.rpc.latencyMs,
+          message: redactSecrets(soroban.rpc.message ?? "reachable")
+        }
+      : {
+          status: "down",
+          latencyMs: soroban.rpc.latencyMs,
+          message: redactSecrets(soroban.rpc.message ?? "unreachable")
+        };
+
+    components.contract = soroban.contract.ok
+      ? {
+          status: (soroban.contract.latencyMs ?? 0) > rpcDegradedLatencyMs ? "degraded" : "up",
+          latencyMs: soroban.contract.latencyMs,
+          message: redactSecrets(soroban.contract.message ?? "simulation_ok")
+        }
+      : {
+          status: "down",
+          latencyMs: soroban.contract.latencyMs,
+          message: redactSecrets(soroban.contract.message ?? "simulation_failed")
+        };
 
     if (!soroban.rpc.ok || !soroban.contract.ok) {
       res.status(503).json({
@@ -185,12 +307,20 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
 
   // Surface the background event listener's health. A degraded listener (e.g.
   // during a Soroban RPC outage with active back-off) does not make the API
-  // unready for reads, so this is reported informationally rather than failing
-  // the readiness probe.
+  // unready for reads, so it never triggers a 503 here - but (Issue #935) it
+  // now does pull the *overall* status down to "degraded" alongside a slow
+  // db/rpc/contract, since ops should be aware something needs attention even
+  // though traffic keeps flowing.
   const eventListener = getServiceHealth();
 
+  const anyDegraded =
+    components.db.status === "degraded" ||
+    components.rpc.status === "degraded" ||
+    components.contract.status === "degraded" ||
+    eventListener.status === "degraded";
+
   res.json({
-    status: "ready",
+    status: anyDegraded ? "degraded" : "ready",
     version: SERVICE_VERSION,
     components: { ...components, eventListener },
   });
