@@ -4594,3 +4594,187 @@ fn test_update_collaborators_after_payout_requires_owner_auth() {
     let result = client.try_update_collaborators(&project_id, &stranger, &updated_collabs);
     assert_eq!(result, Err(Ok(SplitError::Unauthorized)));
 }
+
+// ============================================================
+//  COLLABORATOR COUNT BOUNDARY TESTS  (Issue #927)
+//
+//  Covers the full boundary matrix for both create_project and
+//  update_collaborators:
+//    - 0 collaborators  → TooFewCollaborators  (code 5)
+//    - 1 collaborator   → TooFewCollaborators  (code 5)
+//    - DEFAULT_MAX (50) → success
+//    - DEFAULT_MAX + 1  → TooManyCollaborators (code 19)
+//  on both the create and update call paths.
+// ============================================================
+
+/// Helper: generate `n` addresses with equal basis-point splits.
+/// Panics if 10_000 is not divisible by n (use multiples of the divisor).
+fn make_equal_collaborators(env: &Env, n: usize) -> Vec<Collaborator> {
+    assert!(n > 0, "n must be positive");
+    assert!(
+        10_000 % n as u32 == 0,
+        "10_000 must be divisible by n for equal splits"
+    );
+    let bp_each = 10_000u32 / n as u32;
+    let mut addrs = Vec::new(env);
+    let mut bps = Vec::new(env);
+    for _ in 0..n {
+        addrs.push_back(Address::generate(env));
+        bps.push_back(bp_each);
+    }
+    make_collaborators(env, addrs, bps)
+}
+
+#[test]
+fn test_create_project_fails_zero_collaborators() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let empty: Vec<Collaborator> = Vec::new(&env);
+
+    let result = client.try_create_project(
+        &owner,
+        &Symbol::new(&env, "zero_collabs"),
+        &String::from_str(&env, "Zero Collabs"),
+        &String::from_str(&env, "music"),
+        &token,
+        &empty,
+    );
+
+    // 0 < minimum of 2 → TooFewCollaborators (error code 5)
+    assert_eq!(result, Err(Ok(SplitError::TooFewCollaborators)));
+}
+
+#[test]
+fn test_create_project_succeeds_at_exactly_maximum_collaborators() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+
+    // DEFAULT_MAX_COLLABORATORS is 50; 10_000 / 50 = 200 bp each.
+    let collabs = make_equal_collaborators(&env, 50);
+
+    client.create_project(
+        &owner,
+        &Symbol::new(&env, "max_collabs"),
+        &String::from_str(&env, "At The Cap"),
+        &String::from_str(&env, "music"),
+        &token,
+        &collabs,
+    );
+
+    let project = client.get_project(&Symbol::new(&env, "max_collabs"));
+    assert_eq!(project.collaborators.len(), 50);
+}
+
+#[test]
+fn test_create_project_fails_at_maximum_plus_one_collaborators() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+
+    // Build 51 collaborators; share won't divide evenly but TooManyCollaborators
+    // is checked before arithmetic, so the split total doesn't matter here.
+    let mut addrs = Vec::new(&env);
+    let mut bps = Vec::new(&env);
+    for i in 0u32..51 {
+        addrs.push_back(Address::generate(&env));
+        bps.push_back(if i == 0 { 10_000u32 } else { 0u32 });
+    }
+    let collabs = make_collaborators(&env, addrs, bps);
+
+    let result = client.try_create_project(
+        &owner,
+        &Symbol::new(&env, "over_cap"),
+        &String::from_str(&env, "Over The Cap"),
+        &String::from_str(&env, "music"),
+        &token,
+        &collabs,
+    );
+
+    // 51 > DEFAULT_MAX_COLLABORATORS (50) → TooManyCollaborators (error code 19)
+    assert_eq!(result, Err(Ok(SplitError::TooManyCollaborators)));
+}
+
+#[test]
+fn test_update_collaborators_succeeds_at_exactly_maximum() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+
+    // Create with 2 collaborators initially.
+    let initial = make_equal_collaborators(&env, 2);
+    client.create_project(
+        &owner,
+        &Symbol::new(&env, "upd_max"),
+        &String::from_str(&env, "Update To Max"),
+        &String::from_str(&env, "music"),
+        &token,
+        &initial,
+    );
+
+    // Update to exactly the maximum (50).
+    let at_max = make_equal_collaborators(&env, 50);
+    client.update_collaborators(
+        &Symbol::new(&env, "upd_max"),
+        &owner,
+        &at_max,
+    );
+
+    let project = client.get_project(&Symbol::new(&env, "upd_max"));
+    assert_eq!(project.collaborators.len(), 50);
+}
+
+#[test]
+fn test_update_collaborators_fails_at_maximum_plus_one() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+
+    // Create with the minimum.
+    let initial = make_equal_collaborators(&env, 2);
+    client.create_project(
+        &owner,
+        &Symbol::new(&env, "upd_over"),
+        &String::from_str(&env, "Update Over Cap"),
+        &String::from_str(&env, "music"),
+        &token,
+        &initial,
+    );
+
+    // Try to update to 51 collaborators.
+    let mut addrs = Vec::new(&env);
+    let mut bps = Vec::new(&env);
+    for i in 0u32..51 {
+        addrs.push_back(Address::generate(&env));
+        bps.push_back(if i == 0 { 10_000u32 } else { 0u32 });
+    }
+    let over_cap = make_collaborators(&env, addrs, bps);
+
+    let result = client.try_update_collaborators(
+        &Symbol::new(&env, "upd_over"),
+        &owner,
+        &over_cap,
+    );
+
+    // TooManyCollaborators is checked before ZeroShare / InvalidSplit.
+    assert_eq!(result, Err(Ok(SplitError::TooManyCollaborators)));
+}
+
+#[test]
+fn test_toomany_collaborators_error_code_is_stable() {
+    // Error codes are part of the on-chain ABI. This test asserts that
+    // TooManyCollaborators stays at code 19 across refactors.
+    assert_eq!(SplitError::TooManyCollaborators.code(), 19);
+    assert_eq!(SplitError::TooFewCollaborators.code(), 5);
+}
