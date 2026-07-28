@@ -1,0 +1,51 @@
+name: Migration Dry-Run Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  migration-dry-run:
+    name: Dry-Run TypeORM Migrations
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: splitnaira_test
+          POSTGRES_PASSWORD: test_password_123
+          POSTGRES_DB: splitnaira_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: splitnaira_test
+      DB_PASSWORD: test_password_123
+      DB_NAME: splitnaira_migration_test
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Migration Dry-Run
+        run: npm run migration:dry-run

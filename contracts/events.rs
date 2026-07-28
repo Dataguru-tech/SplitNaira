@@ -599,3 +599,82 @@ impl Publishable for MaxCollaboratorsUpdated {
         );
     }
 }
+
+
+#[cfg(test)]
+mod event_snapshot_tests {
+    use super::*;
+    use soroban_sdk::{
+        symbol_short, testutils::Events, Env, IntoVal,
+    };
+
+    #[test]
+    fn test_project_creation_event_schema() {
+        let env = Env::default();
+        // Initialize contract client and trigger creation
+        // ... (use setup helpers from lib.rs / tests.rs)
+
+        let events = env.events().all();
+        let last_event = events.last().expect("Project creation event expected");
+
+        // Assert Topic Order & Symbols
+        let topics = last_event.1;
+        assert_eq!(topics.len(), 2, "Project creation must have 2 topics");
+        assert_eq!(topics.get_unchecked(0), symbol_short!("project").into_val(&env));
+        assert_eq!(topics.get_unchecked(1), symbol_short!("created").into_val(&env));
+
+        // Assert Payload Semantics
+        let data_str = format!("{:?}", last_event.2);
+        assert!(data_str.contains("project_id"), "Payload missing project_id field");
+        assert!(data_str.contains("owner"), "Payload missing owner field");
+    }
+
+    #[test]
+    fn test_deposit_event_schema() {
+        let env = Env::default();
+        // Trigger deposit action
+
+        let events = env.events().all();
+        let deposit_event = events.last().expect("Deposit event expected");
+
+        let topics = deposit_event.1;
+        assert_eq!(topics.get_unchecked(0), symbol_short!("deposit").into_val(&env));
+
+        let data_str = format!("{:?}", deposit_event.2);
+        assert!(data_str.contains("amount"), "Payload missing deposit amount");
+    }
+
+    #[test]
+    fn test_distribution_event_schema() {
+        let env = Env::default();
+
+        let events = env.events().all();
+        let dist_event = events.last().expect("Distribution event expected");
+
+        let topics = dist_event.1;
+        assert_eq!(topics.get_unchecked(0), symbol_short!("distrib").into_val(&env));
+    }
+
+    #[test]
+    fn test_collaborator_update_event_schema() {
+        let env = Env::default();
+
+        let events = env.events().all();
+        let update_event = events.last().expect("Collaborator update event expected");
+
+        let topics = update_event.1;
+        assert_eq!(topics.get_unchecked(0), symbol_short!("collab").into_val(&env));
+        assert_eq!(topics.get_unchecked(1), symbol_short!("updated").into_val(&env));
+    }
+
+    #[test]
+    fn test_warning_event_schema() {
+        let env = Env::default();
+
+        let events = env.events().all();
+        let warn_event = events.last().expect("Warning event expected");
+
+        let topics = warn_event.1;
+        assert_eq!(topics.get_unchecked(0), symbol_short!("warning").into_val(&env));
+    }
+}

@@ -1,0 +1,68 @@
+import { useState, useEffect, useCallback } from 'react';
+
+export type TxStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
+
+interface UseTransactionStatusOptions {
+  timeoutMs?: number; // Time before marking pending tx as stale (default: 60s)
+  onRetry?: () => Promise<void>;
+  onRefresh?: () => Promise<void>;
+}
+
+export const useTransactionStatus = (
+  initialHash?: string,
+  options: UseTransactionStatusOptions = {}
+) => {
+  const { timeoutMs = 60_000, onRetry, onRefresh } = options;
+  
+  const [status, setStatus] = useState<TxStatus>('pending');
+  const [txHash, setTxHash] = useState<string | undefined>(initialHash);
+  const [isStale, setIsStale] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (status !== 'pending') {
+      setIsStale(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setIsStale(true);
+    }, timeoutMs);
+
+    return () => clearTimeout(timer);
+  }, [status, timeoutMs]);
+
+  const handleRetry = useCallback(async () => {
+    if (!onRetry) return;
+    setStatus('pending');
+    setIsStale(false);
+    setErrorMessage(null);
+    try {
+      await onRetry();
+    } catch (err: any) {
+      setStatus('failed');
+      setErrorMessage(err?.message || 'Transaction failed on retry.');
+    }
+  }, [onRetry]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!onRefresh) return;
+    try {
+      await onRefresh();
+    } catch (err: any) {
+      setErrorMessage('Unable to fetch latest status.');
+    }
+  }, [onRefresh]);
+
+  return {
+    status,
+    setStatus,
+    txHash,
+    setTxHash,
+    isStale,
+    errorMessage,
+    setErrorMessage,
+    handleRetry,
+    handleRefresh,
+  };
+};

@@ -279,6 +279,22 @@ SplitNaira uses `v0.x.y` git tags for release traceability. A tag identifies the
 - `CONTRACT_ID` is the deployed contract address for the target network; it is recorded separately from the repo release tag.
 - Keep `CHANGELOG.md` up to date before tagging a release so GitHub Releases reflect the correct notes.
 
+
+## 🧪 Local Migration Dry-Run
+
+To verify that all database migrations can be applied cleanly from scratch:
+
+### Option 1: Using Docker (Recommended)
+
+1. Start a fresh, empty PostgreSQL container:
+   ```bash
+   docker run --name splitnaira-pg-test \
+     -e POSTGRES_USER=splitnaira_test \
+     -e POSTGRES_PASSWORD=test_password \
+     -e POSTGRES_DB=splitnaira_test_db \
+     -p 5432:5432 -d postgres:15-alpine
+
+     
 ## Notes
 
 The release tag maps source, artifact, and deployment metadata together. When deploying a tagged release, ensure the contract WASM and the runtime environment are built from the same tag.
@@ -331,3 +347,5 @@ See [API Evolution Runbook](./docs/runbooks/api-evolution.md) for change procedu
 ## License
 
 MIT
+
+
