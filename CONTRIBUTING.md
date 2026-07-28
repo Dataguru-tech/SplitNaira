@@ -114,6 +114,11 @@ cargo test
 - Switch to **Testnet** in Freighter settings
 - Fund your testnet wallet via [Stellar Friendbot](https://friendbot.stellar.org)
 
+> 🪟 **Windows contributors:** see
+> [`docs/WINDOWS_TROUBLESHOOTING.md`](./docs/WINDOWS_TROUBLESHOOTING.md) for
+> PowerShell-specific install/build/test commands and common Node, Rust,
+> Docker, and path/line-ending issues.
+
 ---
 
 ## 🌿 Branching Strategy
