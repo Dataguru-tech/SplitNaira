@@ -8,7 +8,7 @@ const repoRoot = resolve(scriptDir, "..");
 const interfacePath = resolve(repoRoot, "contracts/interface/splitnaira.contract-interface.json");
 
 const contractInterface = JSON.parse(readFileSync(interfacePath, "utf8"));
-
+// Simple healthcheck script for deployment readiness verification
 function mapSorobanTypeToTS(type) {
   const mappings = {
     Address: "string",

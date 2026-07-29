@@ -6,7 +6,7 @@ Thank you for your interest in contributing to **SplitNaira** — a royalty dist
 
 ## 📋 Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
+<!-- - [Code of Conduct](#code-of-conduct) -->
 - [How Can I Contribute?](#how-can-i-contribute)
 - [Development Setup](#development-setup)
 - [Branching Strategy](#branching-strategy)

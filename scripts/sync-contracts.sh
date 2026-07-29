@@ -100,3 +100,10 @@ echo "Done. Next steps:"
 echo "  1. Set backend CONTRACT_ID and frontend NEXT_PUBLIC_CONTRACT_ID to $CONTRACT_ID"
 echo "  2. Run smoke tests (see docs/runbooks/ops-deployment-rollback.md)"
 echo "  3. Commit contract.json, contract.ts, and release-info.json if this is a tracked deploy"
+#!/bin/bash
+# Contract Release Artifact Sync Script
+# Run from repository root: ./scripts/sync-contracts.sh [--non-interactive]
+#
+# Environment:
+#   CONTRACT_ID  - deployed Soroban contract address (required in --non-interactive)
+#   NETWORK      - testnet | mainnet (default: testnet)
