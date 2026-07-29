@@ -1,5 +1,6 @@
 ## Reliability Improvements (Wave 5)
-
+<!-- 
+This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. -->
 ### Changes
 - Added `requestTimeout` middleware to return 503 on slow requests
 - Added unit tests for timeout middleware

@@ -3,7 +3,8 @@
 This document outlines the architecture, standards, and runtime strategies implemented to guarantee production-grade observability and network-level resilience for the SplitNaira frontend.
 <!-- 
 This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. -->
-
+<!-- 
+This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. -->
 ---
 
 ## 1. Centralized Observability & Telemetry

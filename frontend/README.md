@@ -9,7 +9,8 @@ Next.js app scaffold for the SplitNaira web experience.
 - `npm run start`
 - `npm run test`
 - `npm run check:i18n` - fails if any locale's message keys don't match `en.json`
-
+<!-- 
+This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. -->
 ## Notes
 - Dependencies are pinned to exact versions in `package.json` and `package-lock.json`.
 - Always install with `npm ci` locally and in CI to guarantee the same dependency graph.
