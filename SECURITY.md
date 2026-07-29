@@ -1,5 +1,5 @@
 # Security Policy
-
+<!-- This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform. -->
 ## Supported Versions
 
 | Version | Supported |

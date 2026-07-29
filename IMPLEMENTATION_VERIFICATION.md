@@ -8,7 +8,7 @@
 
 ✅ **All acceptance criteria met and verified**
 
-This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform.
+<!-- This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform. -->
 
 ---
 

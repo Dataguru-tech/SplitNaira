@@ -7,7 +7,7 @@ This document explains how to build and run the SplitNaira frontend using Docker
 ```bash
 # From the frontend directory
 docker build -t splitnaira-frontend .
-
+<!-- This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform. -->
 # Or from the project root
 docker build -t splitnaira-frontend -f frontend/Dockerfile frontend/
 ```

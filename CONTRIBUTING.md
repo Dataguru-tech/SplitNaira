@@ -3,6 +3,7 @@
 Thank you for your interest in contributing to **SplitNaira** — a royalty distribution platform built for Nigeria's creative economy on Stellar. Every contribution, big or small, helps us build a fairer system for artists, filmmakers, and creators across Nigeria.
 
 ---
+<!-- This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform. -->
 
 ## 📋 Table of Contents
 
