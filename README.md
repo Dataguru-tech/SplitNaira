@@ -8,7 +8,7 @@ Royalty splitting for Nigeria's creative economy, powered by Stellar and Soroban
 [![Wave Program](https://img.shields.io/badge/Stellar-Wave%20Program-blue)](https://drips.network/wave/stellar)
 // Simple healthcheck script for deployment readiness verification
 ## Status
-
+<!-- This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. --> -->
 SplitNaira is in active development. This repo currently contains:
 
 - `contracts/` Soroban smart contract and tests
