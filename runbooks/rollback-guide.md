@@ -42,4 +42,5 @@ Soroban contracts cannot be easily "deleted" after deployment, but they can be u
 - [Stuck Payouts Incident Response](../docs/runbooks/stuck-payouts.md) — Playbook for delayed payouts, stuck transactions, and RPC degradation
 - [Ops Deployment & Rollback](../docs/runbooks/ops-deployment-rollback.md) — Contract metadata sync and rollback paths
 - [CI/CD Incident Management](../docs/runbooks/incident-management.md) — CI/CD, deploy, and runtime incident triage
+- [Postgres Backup & Restore](../docs/runbooks/postgres-backup-restore.md) — Issue #839 backup cadence, restore drill, and verification queries for the database half of a rollback
 

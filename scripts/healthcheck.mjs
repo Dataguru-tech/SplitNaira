@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // Simple healthcheck script for deployment readiness verification
 import { createServer } from "node:http";
 
@@ -23,3 +24,4 @@ const server = createServer(async (_req, res) => {
 });
 
 server.listen(PORT, () => console.log(`Healthcheck server on port ${PORT}`));
+// Simple healthcheck script for deployment readiness verification

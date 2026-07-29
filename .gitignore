@@ -24,3 +24,6 @@ pr_body.*
 
 # local
 yarn.lock
+
+# Issue #835: drift check writes a temp dir; ignore it.
+.tmp-openapi-drift/

@@ -92,6 +92,9 @@ jobs:
       - run: npm run migration:run -w backend
       - run: npm run lint -w backend
       - run: npm run build -w backend
+      # Issue #835: Fail CI if the committed OpenAPI artifact has drifted
+      # from the published route schemas. Contributors must regenerate.
+      - run: npm run drift:openapi
       - run: npm run test:compat -w backend -- --reporter=verbose
       - run: npm run test -w backend -- --reporter=verbose
 

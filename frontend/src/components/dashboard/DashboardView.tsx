@@ -9,7 +9,7 @@ import type {
   AdminStatusState,
 } from "@/lib/api";
 import type { WalletState } from "@/lib/wallet";
-import { SummaryCardSkeleton } from "../Skeleton";
+import { SummaryCardSkeleton, Skeleton } from "../Skeleton";
 import { ProjectCard } from "../ProjectCard";
 
 export interface AllowlistActionResult {
@@ -150,7 +150,11 @@ export function DashboardView({
       </div>
 
       {wallet.connected && isContractAdmin && tokenAllowlist && (
-        <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-greenBright/10">
+        isLoadingDashboard ? (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-greenBright/10">
+            <SummaryCardSkeleton />
+          </div>
+        ) : (
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="space-y-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-greenBright/80">
@@ -308,7 +312,12 @@ export function DashboardView({
 
       {/* Emergency / Unallocated recovery console */}
       {wallet.connected && isContractAdmin && (
-        <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-goldLight/10">
+        isLoadingDashboard ? (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-goldLight/10">
+            <SummaryCardSkeleton />
+          </div>
+        ) : (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-goldLight/10">
           <div className="space-y-1 mb-8">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-goldLight/80">
               Admin — Recovery Console
@@ -462,7 +471,12 @@ export function DashboardView({
 
       {/* Issue #165: Distribution Pause Control Plane */}
       {wallet.connected && isContractAdmin && (
-        <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-red-500/10">
+        isLoadingDashboard ? (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-red-500/10">
+            <SummaryCardSkeleton />
+          </div>
+        ) : (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-red-500/10">
           <div className="flex flex-wrap items-start justify-between gap-6 mb-8">
             <div className="space-y-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-400/80">
@@ -545,31 +559,37 @@ export function DashboardView({
 
       {/* User Earnings Section */}
       {wallet.connected && (
-        <div className="glass-card rounded-[2.5rem] p-8 md:p-10 bg-greenMid/5 border-greenBright/10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="space-y-1">
-              <h2 className="font-display text-2xl tracking-tight">Your Cumulative Earnings</h2>
-              <p className="text-sm text-muted">Aggregate revenue share across all active contracts.</p>
+        isLoadingDashboard ? (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 bg-greenMid/5 border-greenBright/10">
+            <SummaryCardSkeleton />
+          </div>
+        ) : (
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 bg-greenMid/5 border-greenBright/10">
+            <div className="flex items-center justify-between mb-8">
+              <div className="space-y-1">
+                <h2 className="font-display text-2xl tracking-tight">Your Cumulative Earnings</h2>
+                <p className="text-sm text-muted">Aggregate revenue share across all active contracts.</p>
+              </div>
+              <div className="text-right">
+                <p className="text-4xl font-display text-greenBright">
+                  {Object.values(userEarnings).reduce((sum, val) => sum + Number(val), 0).toLocaleString()}
+                  <span className="text-sm font-sans opacity-40 ml-2">Stroops</span>
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-4xl font-display text-greenBright">
-                {Object.values(userEarnings).reduce((sum, val) => sum + Number(val), 0).toLocaleString()}
-                <span className="text-sm font-sans opacity-40 ml-2">Stroops</span>
-              </p>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {dashboardData
+                .filter((p) => p.collaborators.some((c) => c.address === wallet.address))
+                .map((p) => (
+                  <ProjectCard
+                    key={p.projectId}
+                    project={p}
+                    userEarnings={userEarnings[p.projectId]}
+                  />
+                ))}
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {dashboardData
-              .filter((p) => p.collaborators.some((c) => c.address === wallet.address))
-              .map((p) => (
-                <ProjectCard
-                  key={p.projectId}
-                  project={p}
-                  userEarnings={userEarnings[p.projectId]}
-                />
-              ))}
-          </div>
-        </div>
+        )
       )}
 
       {/* Performance Rollups */}
@@ -587,26 +607,36 @@ export function DashboardView({
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {dashboardData.map((p) => (
-                <tr key={p.projectId} className="group hover:bg-white/2 transition-colors">
-                  <td className="py-4 pl-4">
-                    <p className="font-bold text-sm">{sanitizeText(p.title)}</p>
-                    <p className="text-[9px] font-mono text-muted">{p.projectId}</p>
-                  </td>
-                  <td className="py-4">
-                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] font-bold uppercase">{sanitizeText(p.projectType)}</span>
-                  </td>
-                  <td className="py-4 text-right font-mono text-xs text-greenBright/80">
-                    {Number(p.balance).toLocaleString()}
-                  </td>
-                  <td className="py-4 text-right font-mono text-xs">
-                    {Number(p.totalDistributed).toLocaleString()}
-                  </td>
-                  <td className="py-4 text-right font-mono text-xs pr-4">
-                    {p.distributionRound}
-                  </td>
-                </tr>
-              ))}
+              {isLoadingDashboard
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="py-4 pl-4"><Skeleton variant="line" className="w-3/4" /></td>
+                      <td className="py-4"><Skeleton variant="line" className="w-1/2" /></td>
+                      <td className="py-4 text-right"><Skeleton variant="line" className="w-16 ml-auto" /></td>
+                      <td className="py-4 text-right"><Skeleton variant="line" className="w-16 ml-auto" /></td>
+                      <td className="py-4 text-right pr-4"><Skeleton variant="line" className="w-8 ml-auto" /></td>
+                    </tr>
+                  ))
+                : dashboardData.map((p) => (
+                    <tr key={p.projectId} className="group hover:bg-white/2 transition-colors">
+                      <td className="py-4 pl-4">
+                        <p className="font-bold text-sm">{sanitizeText(p.title)}</p>
+                        <p className="text-[9px] font-mono text-muted">{p.projectId}</p>
+                      </td>
+                      <td className="py-4">
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] font-bold uppercase">{sanitizeText(p.projectType)}</span>
+                      </td>
+                      <td className="py-4 text-right font-mono text-xs text-greenBright/80">
+                        {Number(p.balance).toLocaleString()}
+                      </td>
+                      <td className="py-4 text-right font-mono text-xs">
+                        {Number(p.totalDistributed).toLocaleString()}
+                      </td>
+                      <td className="py-4 text-right font-mono text-xs pr-4">
+                        {p.distributionRound}
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
           </table>
         </div>

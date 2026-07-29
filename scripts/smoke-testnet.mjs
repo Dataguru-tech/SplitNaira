@@ -9,7 +9,13 @@
  *
  * Exits 0 only if every step succeeds.  Intended as a manual-dispatch CI job
  * and as a post-deploy sanity check before promoting to production.
- *
+ *#!/bin/bash
+# Contract Release Artifact Sync Script
+# Run from repository root: ./scripts/sync-contracts.sh [--non-interactive]
+#
+# Environment:
+#   CONTRACT_ID  - deployed Soroban contract address (required in --non-interactive)
+#   NETWORK      - testnet | mainnet (default: testnet)
  * Usage:
  *   STELLAR_SECRET_KEY=S... CONTRACT_ID=C... node scripts/smoke-testnet.mjs
  *

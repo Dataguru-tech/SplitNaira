@@ -13,6 +13,14 @@ Closes #
 - [ ] Integration / E2E tests pass
 - [ ] Manually verified on local stack
 
+## PR Checklist
+- [ ] Code follows the project's style guide
+- [ ] Tests written/updated and passing
+- [ ] No console.log or debug statements left in
+- [ ] Environment variables added to `.env.example` if needed
+- [ ] Documentation updated if behaviour changed
+- [ ] Soroban contracts tested on Stellar testnet
+
 ## Deploy Impact
 <!-- Complete this section for any PR that ships to production -->
 
