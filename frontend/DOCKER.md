@@ -11,7 +11,8 @@ docker build -t splitnaira-frontend .
 # Or from the project root
 docker build -t splitnaira-frontend -f frontend/Dockerfile frontend/
 ```
-
+<!-- 
+This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. -->
 ## Running the Container
 
 ### Basic Run
