@@ -68,6 +68,15 @@ function mockFastDb() {
   mockDb(() => Promise.resolve([{ one: 1 }]));
 }
 
+function mockHungDb() {
+  mockDb(
+    () =>
+      new Promise(() => {
+        // Never resolves — simulates a hung database connection.
+      })
+  );
+}
+
 function mockSlowDb(delayMs: number) {
   mockDb(
     () =>
@@ -88,6 +97,15 @@ function mockFastRpc() {
   });
 }
 
+function mockHungRpc() {
+  vi.mocked(checkSorobanReachability).mockImplementation(
+    () =>
+      new Promise(() => {
+        // Never resolves — simulates a hung RPC connection.
+      })
+  );
+}
+
 describe("GET /health/ready - degraded health contract (Issue #935)", () => {
   beforeEach(() => {
     markStartupComplete();
@@ -99,6 +117,8 @@ describe("GET /health/ready - degraded health contract (Issue #935)", () => {
     });
     delete process.env.HEALTH_DB_DEGRADED_LATENCY_MS;
     delete process.env.HEALTH_RPC_DEGRADED_LATENCY_MS;
+    delete process.env.HEALTH_DB_CHECK_TIMEOUT_MS;
+    delete process.env.HEALTH_RPC_CHECK_TIMEOUT_MS;
     process.env.DATABASE_URL = FIXTURE_DATABASE_URL;
     process.env.SOROBAN_RPC_URL = FIXTURE_RPC_URL;
   });
@@ -108,6 +128,8 @@ describe("GET /health/ready - degraded health contract (Issue #935)", () => {
     vi.resetAllMocks();
     delete process.env.HEALTH_DB_DEGRADED_LATENCY_MS;
     delete process.env.HEALTH_RPC_DEGRADED_LATENCY_MS;
+    delete process.env.HEALTH_DB_CHECK_TIMEOUT_MS;
+    delete process.env.HEALTH_RPC_CHECK_TIMEOUT_MS;
     delete process.env.DATABASE_URL;
     delete process.env.SOROBAN_RPC_URL;
   });
@@ -244,5 +266,121 @@ describe("GET /health/ready - degraded health contract (Issue #935)", () => {
     expect(serialized).not.toContain(FIXTURE_RPC_URL);
     expect(serialized).not.toContain("sup3rSecretPW");
     expect(serialized).not.toContain("apikey_abc123SECRET");
+  });
+});
+
+// ─── Issue #843: readiness dependency timeout tests ───────────────────────
+
+describe("GET /health/ready - dependency timeout (Issue #843)", () => {
+  beforeEach(() => {
+    markStartupComplete();
+    vi.mocked(getEnvDiagnostics).mockReturnValue({ ok: true });
+    vi.mocked(getServiceHealth).mockReturnValue({
+      status: "healthy",
+      lastSuccessfulPoll: new Date().toISOString(),
+      consecutiveErrors: 0,
+    });
+    delete process.env.HEALTH_DB_DEGRADED_LATENCY_MS;
+    delete process.env.HEALTH_RPC_DEGRADED_LATENCY_MS;
+    delete process.env.HEALTH_DB_CHECK_TIMEOUT_MS;
+    delete process.env.HEALTH_RPC_CHECK_TIMEOUT_MS;
+    process.env.DATABASE_URL = FIXTURE_DATABASE_URL;
+    process.env.SOROBAN_RPC_URL = FIXTURE_RPC_URL;
+  });
+
+  afterEach(() => {
+    resetStartupComplete();
+    vi.resetAllMocks();
+    delete process.env.HEALTH_DB_DEGRADED_LATENCY_MS;
+    delete process.env.HEALTH_RPC_DEGRADED_LATENCY_MS;
+    delete process.env.HEALTH_DB_CHECK_TIMEOUT_MS;
+    delete process.env.HEALTH_RPC_CHECK_TIMEOUT_MS;
+    delete process.env.DATABASE_URL;
+    delete process.env.SOROBAN_RPC_URL;
+  });
+
+  it("fails fast (503) when database check hangs, not waiting for request-level timeout", async () => {
+    process.env.HEALTH_DB_CHECK_TIMEOUT_MS = "100";
+    mockHungDb();
+    mockFastRpc();
+
+    const start = Date.now();
+    const res = await request(app).get("/health/ready");
+    const elapsed = Date.now() - start;
+
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe("not_ready");
+    expect(res.body.error).toBe("database_unavailable");
+    expect(res.body.components.db.status).toBe("down");
+    expect(res.body.components.db.message).toContain("timeout");
+    // Should complete well before the 30s request-level timeout
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it("fails fast (503) when Soroban RPC check hangs", async () => {
+    process.env.HEALTH_RPC_CHECK_TIMEOUT_MS = "100";
+    mockFastDb();
+    mockHungRpc();
+
+    const start = Date.now();
+    const res = await request(app).get("/health/ready");
+    const elapsed = Date.now() - start;
+
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe("not_ready");
+    expect(res.body.error).toBe("rpc_unavailable");
+    expect(res.body.components.rpc.status).toBe("down");
+    expect(res.body.components.rpc.message).toContain("timeout");
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it("includes requestId correlation ID in timeout response for diagnostics", async () => {
+    process.env.HEALTH_DB_CHECK_TIMEOUT_MS = "100";
+    mockHungDb();
+    mockFastRpc();
+
+    const res = await request(app).get("/health/ready");
+
+    expect(res.status).toBe(503);
+    expect(res.body).toHaveProperty("requestId");
+    expect(typeof res.body.requestId).toBe("string");
+    expect(res.body.requestId.length).toBeGreaterThan(0);
+  });
+
+  it("uses configurable db timeout from HEALTH_DB_CHECK_TIMEOUT_MS", async () => {
+    process.env.HEALTH_DB_CHECK_TIMEOUT_MS = "50";
+    mockHungDb();
+    mockFastRpc();
+
+    const start = Date.now();
+    const res = await request(app).get("/health/ready");
+    const elapsed = Date.now() - start;
+
+    expect(res.status).toBe(503);
+    // Should complete in roughly 50ms (+ overhead)
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it("falls back to default 2000ms db timeout when env var is unset", async () => {
+    // Don't set HEALTH_DB_CHECK_TIMEOUT_MS — use the default
+    mockFastRpc();
+    // DB responds quickly, so default timeout shouldn't fire
+    mockFastDb();
+
+    const res = await request(app).get("/health/ready");
+
+    expect(res.status).toBe(200);
+    expect(res.body.status === "ready" || res.body.status === "degraded").toBe(true);
+  });
+
+  it("defaults db timeout when env var is an invalid value", async () => {
+    process.env.HEALTH_DB_CHECK_TIMEOUT_MS = "invalid";
+    mockFastDb();
+    mockFastRpc();
+
+    const res = await request(app).get("/health/ready");
+
+    // Should not crash — uses the fallback timeout and responds normally
+    expect([200, 503]).toContain(res.status);
   });
 });

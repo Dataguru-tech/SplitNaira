@@ -22,10 +22,25 @@ Run through every item before triggering `mainnet-deploy.yml`.
 | 9 | All CI checks green on `main` | CI workflow must have passed before triggering |
 | 10 | `npm run verify:data-integrity` passes | Run locally or check last CI run |
 | 11 | Database migrations applied | `npm run migration:run -w backend` |
+| 12 | Frontend/backend config consistent | `node scripts/deploy-consistency-check.mjs mainnet` (see Issue #842) |
 
 ---
 
 ## Validation
+
+### Mainnet Readiness Endpoint
+
+The deploy consistency script validates that frontend and backend are configured
+with matching contract IDs, network passphrases, Horizon URLs, and Soroban RPC
+URLs before cutover. Run it as part of pre-launch validation:
+
+```bash
+node scripts/deploy-consistency-check.mjs mainnet
+```
+
+A successful run emits `PASS` (exit 0). Failures print actionable messages
+identifying mismatched or missing values. Warnings indicate potential issues
+that should be reviewed but don't block deployment.
 
 ### Mainnet Readiness Endpoint
 
