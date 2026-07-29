@@ -10,6 +10,35 @@ This doc explains the supported Soroban toolchain for SplitNaira.
 
 ## Install
 
+### Rust (Linux)
+```bash
+# Install rustup and stable Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Source environment
+source "$HOME/.cargo/env"
+
+# Ensure stable channel is default and updated
+rustup default stable
+rustup update
+
+# Install build essential dependencies (Ubuntu/Debian)
+sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+```
+
+### Rust (macOS)
+```bash
+# Option 1: Via rustup shell script (recommended)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustup default stable
+rustup update
+
+# Option 2: Via Homebrew
+brew install rustup-init
+rustup-init
+```
+
 ### Rust (Windows)
 ```powershell
 # Using rustup (PowerShell or CMD)
@@ -72,6 +101,13 @@ cd contracts
 cargo test --locked
 cargo build --release --target wasm32v1-none --locked
 ```
+
+## Build Target Note: `wasm32v1-none` vs `wasm32-unknown-unknown`
+
+SplitNaira builds Soroban contracts targeting `wasm32v1-none` rather than the older `wasm32-unknown-unknown` target.
+
+- **`wasm32v1-none`**: Introduced in modern Rust toolchains as a Tier 2 target for bare-metal WebAssembly v1. It operates without operating system assumptions, std imports, or legacy C runtime linkage, generating optimized, smaller WASM binaries specifically suited for Soroban runtime requirements.
+- **`wasm32-unknown-unknown`**: The legacy target used by older WebAssembly build tooling. It contains assumptions about host system calls and standard library abstractions that are unnecessary and less efficient for Soroban smart contract environments.
 
 ## Deploy artifacts
 - `contracts/target/wasm32v1-none/release/splitnaira_contract.wasm`
