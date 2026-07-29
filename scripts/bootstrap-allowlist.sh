@@ -10,7 +10,13 @@
 #   NETWORK=testnet
 #   RPC_URL=https://soroban-testnet.stellar.org
 #   NETWORK_PASSPHRASE="Test SDF Network ; September 2015"
-
+#!/bin/bash
+# Contract Release Artifact Sync Script
+# Run from repository root: ./scripts/sync-contracts.sh [--non-interactive]
+#
+# Environment:
+#   CONTRACT_ID  - deployed Soroban contract address (required in --non-interactive)
+#   NETWORK      - testnet | mainnet (default: testnet)
 set -euo pipefail
 
 CONTRACT_ID="${1:-${CONTRACT_ID:-}}"

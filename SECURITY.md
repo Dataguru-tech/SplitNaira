@@ -1,5 +1,5 @@
 # Security Policy
-
+// Simple healthcheck script for deployment readiness verification
 ## Supported Versions
 
 | Version | Supported |

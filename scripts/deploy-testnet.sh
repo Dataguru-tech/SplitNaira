@@ -11,7 +11,13 @@
 #   contracts/target/wasm32v1-none/release/release-info.json
 #   backend/src/config/contract.json
 #   frontend/src/config/contract.ts
-
+#!/bin/bash
+# Contract Release Artifact Sync Script
+# Run from repository root: ./scripts/sync-contracts.sh [--non-interactive]
+#
+# Environment:
+#   CONTRACT_ID  - deployed Soroban contract address (required in --non-interactive)
+#   NETWORK      - testnet | mainnet (default: testnet)
 set -euo pipefail
 
 CONTRACTS_DIR="contracts"
