@@ -116,6 +116,27 @@ export function errorHandler(
     });
   }
 
+  // Express body-parser entity-too-large (413) — thrown by express.json()
+  // when the request body exceeds its configured size limit (default 1mb).
+  // Handle it before the generic "unhandled error" path so the correct 413
+  // status is returned instead of an opaque 500. (Issue #840)
+  const entityTooLarge = err as { type?: string; status?: number };
+  if (entityTooLarge.type === "entity.too.large" && entityTooLarge.status === 413) {
+    logger.warn("Request body too large", {
+      requestId,
+      path: req.originalUrl,
+      method: req.method,
+      contentLength: req.headers["content-length"],
+    });
+    return res.status(413).json({
+      error: "payload_too_large",
+      code: "PAYLOAD_TOO_LARGE",
+      message: "Request body exceeds the maximum allowed size (1 MB).",
+      requestId,
+      details: {},
+    });
+  }
+
   // RPC errors are expected, transient failure modes of talking to an
   // external dependency (Horizon/soroban-rpc), not bugs in this service.
   // Handling them here — before the generic "unhandled error" path below

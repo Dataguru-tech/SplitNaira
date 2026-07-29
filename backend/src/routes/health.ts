@@ -107,14 +107,47 @@ export interface ComponentHealth {
 const DEFAULT_DB_DEGRADED_LATENCY_MS = 500;
 const DEFAULT_RPC_DEGRADED_LATENCY_MS = 1500;
 
+// ─── Issue #843: per-dependency timeout ────────────────────────────────────
+//
+// A hung DB or RPC should fail fast (within these timeouts) rather than
+// block the readiness endpoint indefinitely. Without this, a slow DB
+// connection would keep an orchestrator waiting instead of failing over.
+// See docs/runbooks/observability.md for expected orchestrator behaviour.
+const DEFAULT_DB_CHECK_TIMEOUT_MS = 2000;
+const DEFAULT_RPC_CHECK_TIMEOUT_MS = 5000;
+
 /**
- * Reads a positive-integer latency threshold from an env var, falling back
- * to `fallback` when unset or invalid. Read fresh on every request (rather
+ * Races a promise against a timeout. If the promise doesn't settle within
+ * `ms`, the returned promise rejects with a descriptive timeout error.
+ * Always clears the timer to avoid leaking memory.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer!));
+}
+
+function getDbCheckTimeoutMs(): number {
+  return readPositiveIntEnv("HEALTH_DB_CHECK_TIMEOUT_MS", DEFAULT_DB_CHECK_TIMEOUT_MS);
+}
+
+function getRpcCheckTimeoutMs(): number {
+  return readPositiveIntEnv("HEALTH_RPC_CHECK_TIMEOUT_MS", DEFAULT_RPC_CHECK_TIMEOUT_MS);
+}
+
+/**
+ * Reads a positive-integer value from an env var, falling back to
+ * `fallback` when unset or invalid. Read fresh on every request (rather
  * than cached at module load) so it stays in step with `config/env.js`'s
  * own "read process.env directly, no restart required for test overrides"
  * convention and so tests can override it per-case.
  */
-function readLatencyThresholdMs(envVar: string, fallback: number): number {
+function readPositiveIntEnv(envVar: string, fallback: number): number {
   const raw = process.env[envVar];
   if (!raw) return fallback;
   const parsed = Number(raw);
@@ -122,11 +155,11 @@ function readLatencyThresholdMs(envVar: string, fallback: number): number {
 }
 
 function getDbDegradedLatencyMs(): number {
-  return readLatencyThresholdMs("HEALTH_DB_DEGRADED_LATENCY_MS", DEFAULT_DB_DEGRADED_LATENCY_MS);
+  return readPositiveIntEnv("HEALTH_DB_DEGRADED_LATENCY_MS", DEFAULT_DB_DEGRADED_LATENCY_MS);
 }
 
 function getRpcDegradedLatencyMs(): number {
-  return readLatencyThresholdMs("HEALTH_RPC_DEGRADED_LATENCY_MS", DEFAULT_RPC_DEGRADED_LATENCY_MS);
+  return readPositiveIntEnv("HEALTH_RPC_DEGRADED_LATENCY_MS", DEFAULT_RPC_DEGRADED_LATENCY_MS);
 }
 
 /**
@@ -226,7 +259,12 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
 
     try {
       const dbStart = Date.now();
-      const rows = await ds.query('SELECT 1 AS one');
+      const dbCheckTimeoutMs = getDbCheckTimeoutMs();
+      const rows = await withTimeout(
+        ds.query('SELECT 1 AS one'),
+        dbCheckTimeoutMs,
+        "Database health check"
+      );
       const latencyMs = Date.now() - dbStart;
       components.db = {
         status: latencyMs > dbDegradedLatencyMs ? "degraded" : "up",
@@ -235,11 +273,17 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
       };
     } catch (queryErr) {
       const message = queryErr instanceof Error ? queryErr.message : String(queryErr);
-      components.db = { status: "down", message: redactSecrets(`query_failed: ${message}`) };
+      const isTimeout = message.includes("timed out after");
+      components.db = {
+        status: "down",
+        message: redactSecrets(isTimeout ? `timeout: ${message}` : `query_failed: ${message}`)
+      };
       res.status(503).json({
         status: "not_ready",
         error: "database_unavailable",
-        message: "Database query failed; check DATABASE_URL and connectivity.",
+        message: isTimeout
+          ? "Database health check timed out; verify DATABASE_URL and connectivity."
+          : "Database query failed; check DATABASE_URL and connectivity.",
         components,
         requestId,
         details: { error: redactSecrets(message) }
@@ -263,7 +307,12 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
   const rpcDegradedLatencyMs = getRpcDegradedLatencyMs();
 
   try {
-    const soroban = await checkSorobanReachability();
+    const rpcCheckTimeoutMs = getRpcCheckTimeoutMs();
+    const soroban = await withTimeout(
+      checkSorobanReachability(),
+      rpcCheckTimeoutMs,
+      "Soroban RPC health check"
+    );
 
     components.rpc = soroban.rpc.ok
       ? {
@@ -301,7 +350,23 @@ async function handleReadiness(_req: unknown, res: Response, next: NextFunction)
       return;
     }
   } catch (error) {
-    next(error);
+    const message = error instanceof Error ? error.message : String(error);
+    const isTimeout = message.includes("timed out after");
+    components.rpc = {
+      status: "down",
+      message: redactSecrets(isTimeout ? `timeout: ${message}` : `rpc_check_failed: ${message}`)
+    };
+    components.contract = { status: "down", message: "Skipped because Soroban RPC check failed" };
+    res.status(503).json({
+      status: "not_ready",
+      error: "rpc_unavailable",
+      message: isTimeout
+        ? "Soroban RPC health check timed out."
+        : "Soroban RPC or contract simulation is not ready.",
+      components,
+      requestId,
+      details: { error: redactSecrets(message) }
+    });
     return;
   }
 
