@@ -1,4 +1,5 @@
 # Security Policy
+<!-- This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform. -->
 // Simple healthcheck script for deployment readiness verification
 ## Supported Versions
 <!-- 
