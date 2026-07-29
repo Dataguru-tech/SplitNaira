@@ -8,7 +8,7 @@ This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Sp
 | Version | Supported |
 |---------|-----------|
 | `main` branch | Yes |
-
+<!-- This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. --> -->
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability in SplitNaira, please report it responsibly:
