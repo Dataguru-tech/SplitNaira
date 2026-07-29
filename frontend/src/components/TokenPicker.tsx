@@ -1,10 +1,14 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { StrKey } from "@stellar/stellar-sdk";
 import { clsx } from "clsx";
 
-import { KNOWN_TOKENS, getTokenDisplayName, getTokensByNetwork } from "@/lib/token-constants";
+import {
+  KNOWN_TOKENS,
+  getTokenDisplayName,
+  getTokensByNetwork,
+} from "@/lib/token-constants";
 
 export interface TokenPickerProps {
   value: string;
@@ -16,7 +20,7 @@ export interface TokenPickerProps {
 }
 
 function shortContract(contractId: string) {
-  return `${contractId.slice(0, 6)}…${contractId.slice(-6)}`;
+  return `${contractId.slice(0, 6)}\u2026${contractId.slice(-6)}`;
 }
 
 export function TokenPicker({
@@ -29,6 +33,13 @@ export function TokenPicker({
 }: TokenPickerProps) {
   const selectId = useId();
   const customInputId = useId();
+  const errorId = useId();
+  const selectRef = useRef<HTMLSelectElement>(null);
+  const customInputRef = useRef<HTMLInputElement>(null);
+  // Track the element that had focus before the picker first received focus
+  // so we can restore it when the user dismisses the picker via Escape.
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
   const availableTokens = useMemo(() => getTokensByNetwork(network), [network]);
   const selectedToken = useMemo(
     () => KNOWN_TOKENS.find((token) => token.id === value),
@@ -42,6 +53,51 @@ export function TokenPicker({
     !tokenForValidation ||
     StrKey.isValidEd25519PublicKey(tokenForValidation) ||
     StrKey.isValidContract(tokenForValidation);
+  const errorMessage =
+    error ??
+    (customToken && !isCustomValid
+      ? "Enter a valid Stellar token address."
+      : undefined);
+
+  const errorMessageId = errorMessage ? errorId : undefined;
+
+  // Capture the previously active element the first time the picker
+  // receives focus so Escape can restore it. We deliberately do this
+  // on focus (not mount) so first-time focus via tab navigation is
+  // captured before the picker steals focus. We rely on
+  // `event.relatedTarget` rather than `document.activeElement` because
+  // `activeElement` is updated synchronously *before* React's `focus`
+  // handler runs, so reading it would give us the new focus target, not
+  // the previous one.
+  const handleFocusCapture = (
+    event: React.FocusEvent<HTMLDivElement>,
+  ) => {
+    if (previouslyFocusedRef.current !== null) return;
+    const related = event.relatedTarget as HTMLElement | null;
+    if (related && related !== event.currentTarget) {
+      previouslyFocusedRef.current = related;
+    }
+  };
+
+  const restoreFocus = () => {
+    const previous = previouslyFocusedRef.current;
+    if (
+      previous &&
+      typeof previous.focus === "function" &&
+      document.contains(previous)
+    ) {
+      previous.focus();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      // On unmount, restore focus to the element that triggered the picker
+      // so screen-reader users don't lose their navigation context.
+      restoreFocus();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextValue = event.target.value;
@@ -62,33 +118,75 @@ export function TokenPicker({
     onChange(nextValue);
   };
 
+  // Escape: native <select> does not have a portable Escape-to-close
+  // behaviour across browsers. We treat Escape as "clear current selection
+  // and return focus to where the user was before the picker" so keyboard
+  // users have a deterministic, documented way to back out.
+  const handlePickerKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (disabled) return;
+    if (event.key !== "Escape") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (value || isCustom || customToken) {
+      setIsCustom(false);
+      setCustomToken("");
+      onChange("");
+    }
+
+    restoreFocus();
+  };
+
+  const hasError = Boolean(errorMessage);
+  const requiredMark = required ? (
+    <span className="ml-1 text-red-400" aria-hidden="true">
+      *
+    </span>
+  ) : null;
+
   return (
-    <div className="space-y-3 md:col-span-2">
+    <div
+      className="space-y-3 md:col-span-2"
+      aria-disabled={disabled || undefined}
+      onKeyDown={handlePickerKeyDown}
+      onFocus={handleFocusCapture}
+    >
       <div className="space-y-2">
         <label
           htmlFor={selectId}
           className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted px-1"
         >
           Asset Token
-          {required && <span className="ml-1 text-red-400">*</span>}
+          {requiredMark}
         </label>
         <select
+          ref={selectRef}
           id={selectId}
           value={selectedValue}
           onChange={handleSelectChange}
           disabled={disabled}
+          required={required}
+          aria-required={required || undefined}
+          aria-invalid={hasError || undefined}
+          aria-describedby={errorMessageId}
+          aria-label={`Asset token${network ? ` for ${network}` : ""}`}
           className={clsx(
             "glass-input w-full rounded-2xl px-5 py-4 text-sm cursor-pointer",
-            error ? "border-red-500/50 bg-red-500/5" : "",
+            hasError ? "border-red-500/50 bg-red-500/5" : "",
           )}
         >
-          <option value="">Select a token…</option>
+          <option value="">Select a token\u2026</option>
           {availableTokens.map((token) => (
-            <option key={`${token.network}-${token.code}-${token.id}`} value={token.id}>
-              {token.code} — {token.name} ({token.network}) · {shortContract(token.id)}
+            <option
+              key={`${token.network}-${token.code}-${token.id}`}
+              value={token.id}
+            >
+              {token.code} \u2014 {token.name} ({token.network}) \u00b7{" "}
+              {shortContract(token.id)}
             </option>
           ))}
-          <option value="custom">Custom…</option>
+          <option value="custom">Custom\u2026</option>
         </select>
       </div>
 
@@ -101,22 +199,22 @@ export function TokenPicker({
             Custom token contract
           </label>
           <input
+            ref={customInputRef}
             id={customInputId}
             type="text"
             value={customToken}
             onChange={handleCustomChange}
             disabled={disabled}
-            placeholder="Paste a Stellar contract address, e.g. C…"
+            required={required && isCustom}
+            aria-required={(required && isCustom) || undefined}
+            aria-invalid={hasError || undefined}
+            aria-describedby={errorMessageId}
+            placeholder="Paste a Stellar contract address, e.g. C\u2026"
             className={clsx(
               "glass-input w-full rounded-2xl px-5 py-4 font-mono text-sm",
-              (customToken && !isCustomValid) || error ? "border-red-500/50 bg-red-500/5" : "",
+              hasError ? "border-red-500/50 bg-red-500/5" : "",
             )}
           />
-          {customToken && !isCustomValid && (
-            <p className="px-1 text-[10px] font-bold text-red-400 uppercase tracking-tighter">
-              Enter a valid Stellar token address.
-            </p>
-          )}
         </div>
       )}
 
@@ -125,13 +223,19 @@ export function TokenPicker({
           <p className="text-[10px] font-bold uppercase tracking-widest text-muted mb-1">
             Selected Token
           </p>
-          <p className="break-all font-mono text-sm text-ink">{getTokenDisplayName(value)}</p>
+          <p className="break-all font-mono text-sm text-ink" aria-live="polite">
+            {getTokenDisplayName(value)}
+          </p>
         </div>
       )}
 
-      {error && (
-        <p className="px-1 text-[10px] font-bold text-red-400 uppercase tracking-tighter">
-          {error}
+      {errorMessage && (
+        <p
+          id={errorId}
+          role={error ? "alert" : undefined}
+          className="px-1 text-[10px] font-bold text-red-400 uppercase tracking-tighter"
+        >
+          {errorMessage}
         </p>
       )}
     </div>
