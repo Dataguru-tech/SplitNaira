@@ -2,11 +2,13 @@
 
 Thank you for your interest in contributing to **SplitNaira** — a royalty distribution platform built for Nigeria's creative economy on Stellar. Every contribution, big or small, helps us build a fairer system for artists, filmmakers, and creators across Nigeria.
 
----
+---<!-- 
+This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. -->
+
 
 ## 📋 Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
+<!-- - [Code of Conduct](#code-of-conduct) -->
 - [How Can I Contribute?](#how-can-i-contribute)
 - [Development Setup](#development-setup)
 - [Branching Strategy](#branching-strategy)

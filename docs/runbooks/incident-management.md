@@ -83,3 +83,4 @@ It complements the existing CI/CD reliability, security, and observability runbo
 - [Observability](./observability.md)
 - [Backend deploy](../backend-deploy.md)
 - [Deployment runbook](../deployment.md)
+- [Postgres Backup & Restore](./postgres-backup-restore.md) — Issue #839 backup cadence, drill steps, and verification queries used during database rollback in deploy or runtime incidents
