@@ -1451,13 +1451,15 @@ const isDirectRun = process.argv[1] && (
 
 if (isDirectRun) {
   const spec = generateOpenApi();
-  const docsDir = path.join(path.dirname(__filename), "..", "..", "docs");
+  // Allow CI drift-check scripts to redirect output to a temp path by
+  // setting OPENAPI_OUTPUT_DIR. Falls back to the standard docs/ location.
+  const docsDir = process.env.OPENAPI_OUTPUT_DIR
+    ? path.resolve(process.env.OPENAPI_OUTPUT_DIR)
+    : path.join(path.dirname(__filename), "..", "..", "docs");
   if (!fs.existsSync(docsDir)) {
     fs.mkdirSync(docsDir, { recursive: true });
   }
-  fs.writeFileSync(
-    path.join(docsDir, "openapi.yaml"),
-    yaml.stringify(spec)
-  );
-  logger.info("OpenAPI spec generated at docs/openapi.yaml");
+  const outputPath = path.join(docsDir, "openapi.yaml");
+  fs.writeFileSync(outputPath, yaml.stringify(spec));
+  logger.info(`OpenAPI spec generated at ${outputPath}`);
 }
