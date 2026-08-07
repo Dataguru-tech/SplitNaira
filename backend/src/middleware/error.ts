@@ -110,7 +110,7 @@ export function errorHandler(
       // if details existed but had no remediation baked in, remediation
       // was silently dropped. Merge both instead of picking one.
       details: {
-        ...err.details,
+        ...(err.details && typeof err.details === "object" ? err.details : {}),
         ...(err.remediation ? { remediation: err.remediation } : {}),
       },
     });

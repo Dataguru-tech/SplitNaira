@@ -3,7 +3,6 @@ import { projectIdParamSchema, lockProjectSchema, depositSchema, listProjectsSch
 import { AppError, ErrorCode, ErrorType } from "../lib/errors.js";
 import { serializeBigInts, listProjects, fetchProjectById, buildLockProjectUnsignedXdr, buildDepositUnsignedXdr, encodeCursor, decodeCursor, simulateReadOnlyContractCall } from "../services/splits.service.js";
 import { scValToNative } from "@stellar/stellar-sdk";
-import { logger } from "../services/logger.js";
 
 export class SplitsController {
   async listProjects(req: Request, res: Response, next: NextFunction) {
@@ -66,7 +65,7 @@ export class SplitsController {
     try {
       const projectId = projectIdParamSchema.parse(req.params.projectId);
       const body = depositSchema.parse(req.body);
-      const result = await buildDepositUnsignedXdr({ projectId, from: body.from, amount: body.amount });
+      const result = await buildDepositUnsignedXdr({ projectId, from: body.from, amount: body.amount, token: body.token });
       return res.status(200).json(result);
     } catch (error) { return next(error); }
   }

@@ -6,9 +6,7 @@ Royalty splitting for Nigeria's creative economy, powered by Stellar and Soroban
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-7B61FF)](https://stellar.org)
 [![Soroban](https://img.shields.io/badge/Smart%20Contracts-Soroban-blueviolet)](https://soroban.stellar.org)
 [![Wave Program](https://img.shields.io/badge/Stellar-Wave%20Program-blue)](https://drips.network/wave/stellar)
-// Simple healthcheck script for deployment readiness verification
 ## Status
-<!-- This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. --> -->
 SplitNaira is in active development. This repo currently contains:
 
 - `contracts/` Soroban smart contract and tests
@@ -281,36 +279,32 @@ SplitNaira uses `v0.x.y` git tags for release traceability. A tag identifies the
 - Keep `CHANGELOG.md` up to date before tagging a release so GitHub Releases reflect the correct notes.
 
 
-## 🧪 Local Migration Dry-Run
+## Local Migration Dry-Run
 
-To verify that all database migrations can be applied cleanly from scratch:
-
-### Option 1: Using Docker (Recommended)
-
-1. Start a fresh, empty PostgreSQL container:
-   ```bash
-   docker run --name splitnaira-pg-test \
-     -e POSTGRES_USER=splitnaira_test \
-     -e POSTGRES_PASSWORD=test_password \
-     -e POSTGRES_DB=splitnaira_test_db \
-     -p 5432:5432 -d postgres:15-alpine
-
-     
-## Notes
-
-The release tag maps source, artifact, and deployment metadata together. When deploying a tagged release, ensure the contract WASM and the runtime environment are built from the same tag.
-
-### Data integrity & release ops
+To verify backend migrations from a clean database:
 
 ```bash
-npm run verify:data-integrity   # contract interface + generated types in sync
+npm run migration:dry-run
 ```
+
+This delegates to `backend/scripts/run-migration-dry-run.mjs`, which resets the target database and runs TypeORM migrations against a fresh schema.
+
+## Grant Readiness
+
+SplitNaira is built for royalty splitting in Nigeria's creative economy and is structured to be reviewable by grant programs.
+
+- Transparent on-chain split logic on Stellar Soroban.
+- Wallet-enabled frontend and API backend for a production workflow.
+- Contract, backend, and frontend tests wired into CI/CD.
+- Deployment and rollback runbooks already documented.
+
+See [GrantFox brief](./docs/grantfox-brief.md) for the application-ready summary.
 
 ## CI/CD Pipelines
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to `main` | Full suite: data-integrity, frontend, backend, contracts, security audit |
+| `ci.yml` | push/PR to `main` | Full suite: data integrity, frontend, backend, contracts, security audit |
 | `backend-deploy.yml` | CI success on `main` / manual | Deploy backend to staging or production via Render |
 | `mainnet-deploy.yml` | Manual only | Production mainnet deploy with pre-flight validation gate |
 | `user-onboarding-ci.yml` | push/PR touching onboarding files | Validate register/login/profile routes end-to-end |
@@ -320,33 +314,6 @@ npm run verify:data-integrity   # contract interface + generated types in sync
 | `smoke-testnet.yml` | Manual | Post-deploy smoke test on testnet |
 | `dependency-audit.yml` | Weekly / manual | `npm audit` for high-severity vulnerabilities |
 
-## Mainnet launch readiness
-
-- `mainnet-deploy.yml` enforces a strict gate sequence: secret validation → backend verification → readiness gate → deploy → smoke test → rollback instructions on failure.
-- `cancel-in-progress: false` ensures an in-flight mainnet deploy is never cancelled by a concurrent run.
-- `backend-deploy.yml` validates production deploy configuration and required secrets before triggering Render.
-- `user-onboarding-ci.yml` validates the full register → login → profile lifecycle on every onboarding-related change.
-- CI pipelines use concurrency groups to cancel stale runs and keep mainline validation fast.
-- Operational rollback guidance is documented in `docs/runbooks/mainnet-launch.md`, `docs/runbooks/user-onboarding.md`, and `docs/runbooks/api-evolution.md`.
-
-## Frontend API Evolution
-
-The `ApiClient` (`frontend/src/lib/api-client.ts`) provides:
-
-- **`ApiError`** — typed error class with `isNotFound`, `isUnauthorized`, `isServerError`, `isClientError` helpers and a machine-readable `code` field.
-- **Smart retry** — 4xx client errors are not retried (fail fast); 5xx and network errors retry up to 3 times with back-off.
-- **Enriched Sentry tags** — `httpStatus` and `errorCode` on every captured `ApiError`.
-- **Response mapping** — `mapProjectToCamelCase` handles both camelCase and snake_case backend responses for safe field-naming migrations.
-
-See [API Evolution Runbook](./docs/runbooks/api-evolution.md) for change procedures.
-- `backend-deploy.yml` now validates production deploy configuration, data integrity, and backend build/test before triggering Render.
-- `mainnet-deploy.yml` now runs an explicit manual production release gate with deploy config validation, data integrity, backend lint, build, and tests.
-- A new CI/CD incident management runbook documents incident triage, smoke-check failure handling, rollback, and recovery.
-- CI pipelines use concurrency groups to cancel stale runs and keep mainline validation fast.
-- Operational rollback guidance is documented in `docs/runbooks/ci-data-integrity.md`, `docs/runbooks/incident-management.md`, and `docs/deployment.md`.
-
 ## License
 
 MIT
-
-

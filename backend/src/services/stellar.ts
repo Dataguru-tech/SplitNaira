@@ -61,11 +61,6 @@ function sanitizeRpcErrorMessage(raw: unknown): string {
  */
 type RpcRetryOutcome = "success" | "transient_failure" | "timeout" | "validation_error" | "exhausted";
 
-function classifyRpcError(error: unknown): "timeout" | "validation_error" | "transient_failure" {
-  if (error instanceof RpcTimeoutError) return "timeout";
-  if (error instanceof RequestValidationError) return "validation_error";
-  return "transient_failure";
-}
 
 export interface StellarConfig {
   horizonUrl: string;

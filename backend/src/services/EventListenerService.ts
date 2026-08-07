@@ -31,7 +31,6 @@ let pollInterval: NodeJS.Timeout | null = null;
 let isPolling = false;
 let startLedger: number | null = null;
 let cursor: string | null = null;
-const EVENT_LISTENER_CURSOR_KEY = "event_listener_cursor";
 
 // Resilience state.
 let consecutiveErrors = 0;
@@ -254,19 +253,6 @@ export async function pollEvents() {
           });
           continue;
         }
-
-        const projectId = topics[1] || "";
-        const valueData = scValToNative(event.value) as [
-          string,
-          string | number | bigint
-        ];
-        const recipient = valueData[0];
-        const amount = String(valueData[1]);
-        const txHash = event.txHash;
-        const timestamp = Math.floor(
-          new Date(event.ledgerClosedAt).getTime() / 1000
-        );
-
         // Skip already-indexed transactions. The DB also enforces uniqueness
         // on txHash, but this avoids redundant work during polling.
         const decoded = scValToNative(event.value) as [string, string | number | bigint, number?];

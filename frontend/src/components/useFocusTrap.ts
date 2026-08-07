@@ -1,7 +1,7 @@
-import { useEffect, type RefObject } from "react";
+import { useLayoutEffect, type RefObject } from "react";
 
 export function useFocusTrap(ref: RefObject<HTMLElement | null>, isOpen: boolean) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !ref.current) return;
 
     const modal = ref.current;

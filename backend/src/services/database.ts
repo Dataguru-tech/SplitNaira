@@ -81,7 +81,12 @@ const DEADLOCK_MAX_RETRIES = 3;
 const DEADLOCK_RETRY_DELAY_MS = 50;
 
 function isDeadlockError(error: unknown): boolean {
-  return (error as any)?.code === DEADLOCK_ERROR_CODE;
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === DEADLOCK_ERROR_CODE
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -94,14 +99,6 @@ function sleep(ms: number): Promise<void> {
  * deadlock errors (error code 40P01).
  */
 
-function isRetryableTransactionError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error.code === "40001" || error.code === "40P01")
-  );
-}
 
 export async function withTransaction<T>(
   callback: (queryRunner: QueryRunner) => Promise<T>

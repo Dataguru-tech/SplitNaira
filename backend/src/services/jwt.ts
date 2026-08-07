@@ -1,7 +1,7 @@
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 
 const SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
-const EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
+const EXPIRES_IN = (process.env.JWT_EXPIRES_IN || "24h") as SignOptions["expiresIn"];
 
 export function signToken(walletAddress: string): string {
   return jwt.sign({ walletAddress }, SECRET, { expiresIn: EXPIRES_IN });

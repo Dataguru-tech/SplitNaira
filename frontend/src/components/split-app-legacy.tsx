@@ -989,7 +989,6 @@ export function SplitApp({
     if (activeTab === "dashboard") {
       void onFetchDashboardData();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet.address]);
 
   useEffect(() => {
@@ -1538,4 +1537,3 @@ export function SplitApp({
     </main>
   );
 }
-

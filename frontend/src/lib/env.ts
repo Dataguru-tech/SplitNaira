@@ -66,7 +66,12 @@ const frontendEnvSchema = z.object({
    * missing value is surfaced by printEnvDiagnostics() so contributors know to
    * fill it in before attempting on-chain operations.
    */
-  NEXT_PUBLIC_CONTRACT_ID: contractIdSchema
+  NEXT_PUBLIC_CONTRACT_ID: contractIdSchema,
+
+  NEXT_PUBLIC_TX_POLL_TIMEOUT: z
+    .string()
+    .regex(/^\d+$/, "NEXT_PUBLIC_TX_POLL_TIMEOUT must be a positive integer number of polling attempts")
+    .default("90")
 });
 
 export type FrontendEnv = z.infer<typeof frontendEnvSchema>;
@@ -93,7 +98,8 @@ export function validateEnv(): FrontendEnv {
     NEXT_PUBLIC_SOROBAN_RPC_URL: process.env.NEXT_PUBLIC_SOROBAN_RPC_URL,
     NEXT_PUBLIC_HORIZON_URL: process.env.NEXT_PUBLIC_HORIZON_URL,
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-    NEXT_PUBLIC_CONTRACT_ID: process.env.NEXT_PUBLIC_CONTRACT_ID
+    NEXT_PUBLIC_CONTRACT_ID: process.env.NEXT_PUBLIC_CONTRACT_ID,
+    NEXT_PUBLIC_TX_POLL_TIMEOUT: process.env.NEXT_PUBLIC_TX_POLL_TIMEOUT
   });
 
   if (!result.success) {

@@ -71,7 +71,7 @@ export default function Modal({
 
         <div className="modal-body">{children}</div>
 
-        <button className="modal-close" onClick={onClose}>
+        <button className="modal-close" onClick={onClose} tabIndex={-1}>
           Close
         </button>
       </div>

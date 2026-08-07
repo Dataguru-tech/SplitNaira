@@ -53,7 +53,6 @@ const registry = new OpenAPIRegistry();
 const EXAMPLE_OWNER = "GBJRKIYXAAFD3NZCWJXGUTNKYUQFZC2ANS6LRMBPJCE4IZSMJJMZPQBT";
 const EXAMPLE_COLLAB_A = "GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV";
 const EXAMPLE_COLLAB_B = "GBG234UA6RBPDD5K6FHMQXHUXB5ALOENQGH24Y3W4ERX2YJNQ4MK4V25";
-const EXAMPLE_ADMIN = "GCJIQR7K2ZNIBXKFYHC6YMGD7CX46X3LAUBZAMQSMFB3XPHDY6YAT5GC";
 const EXAMPLE_TOKEN = "CDOVDY3MZDG7PHCGVP7EP2EKQ2ENV26DZW6FKLBRN42LOGIZGXZV3WX5";
 const EXAMPLE_CONTRACT_ID = "CAGR5U5IBEPFVJDZPZUXXNCPXAHNZ6TWVIUTI5RLRH3SZSU4O2VXDOPF";
 const EXAMPLE_PROJECT_ID = "afrobeats_001";
@@ -1172,7 +1171,7 @@ registry.registerPath({
 
 // ─── Health Endpoints ─────────────────────────────────────────────────────────
 
-const HealthResponseSchema = registry.register(
+registry.register(
   "HealthResponse",
   z.object({
     status: z.enum(["ok", "degraded", "not_ready"]),
@@ -1328,22 +1327,22 @@ const MainnetReadinessResponseSchema = registry.register(
     requestId: z.string().optional(),
     error: z.string().optional(),
     message: z.string().optional(),
-    details: z.record(z.any()).optional(),
+    details: z.record(z.string(), z.any()).optional(),
     components: z.object({
       env: z.object({
         ok: z.boolean(),
         message: z.string().optional(),
-        details: z.record(z.any()).optional()
+        details: z.record(z.string(), z.any()).optional()
       }),
       db: z.object({
         ok: z.boolean(),
         message: z.string().optional(),
-        details: z.record(z.any()).optional()
+        details: z.record(z.string(), z.any()).optional()
       }),
       cache: z.object({
         ok: z.boolean(),
         message: z.string().optional(),
-        details: z.record(z.any()).optional()
+        details: z.record(z.string(), z.any()).optional()
       }),
       deploy: z.object({
         ok: z.boolean(),
@@ -1409,6 +1408,19 @@ registry.registerPath({
   },
 });
 
+registry.registerComponent("securitySchemes", "bearerAuth", {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+  description: "JWT obtained from POST /users/login",
+});
+
+registry.registerComponent("securitySchemes", "adminApiKey", {
+  type: "apiKey",
+  in: "header",
+  name: "x-admin-api-key",
+  description: "Payments admin API key for /splits/admin mutation endpoints",
+});
 // ─── Generation ───────────────────────────────────────────────────────────────
 
 export function generateOpenApi() {
@@ -1422,22 +1434,6 @@ export function generateOpenApi() {
       description: "Premium royalty management API on Stellar network.",
     },
     servers: [{ url: "http://localhost:3001" }],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT",
-          description: "JWT obtained from POST /users/login",
-        },
-        adminApiKey: {
-          type: "apiKey",
-          in: "header",
-          name: "x-admin-api-key",
-          description: "Payments admin API key for /splits/admin mutation endpoints",
-        },
-      },
-    },
   });
 }
 

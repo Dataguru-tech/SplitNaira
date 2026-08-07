@@ -45,7 +45,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Run Migration Dry-Run
         run: npm run migration:dry-run

@@ -94,7 +94,6 @@ describe("database connection pool exhaustion", () => {
   });
 
   it("retries on deadlock and eventually succeeds", async () => {
-    let attempt = 0;
 
     vi.spyOn(DataSource.prototype, "initialize").mockImplementation(
       async function (this: DataSource) {
@@ -121,7 +120,6 @@ describe("database connection pool exhaustion", () => {
     await initDatabase();
 
     const callback = vi.fn().mockImplementation(async () => {
-      attempt++;
       if (attempt < 3) {
         const err = new Error("deadlock detected") as Error & { code: string };
         err.code = "40P01";
@@ -214,7 +212,6 @@ describe("database connection pool exhaustion", () => {
   });
 
   it("rolls back non-deadlock errors without retry", async () => {
-    let attempt = 0;
 
     vi.spyOn(DataSource.prototype, "initialize").mockImplementation(
       async function (this: DataSource) {
@@ -241,7 +238,6 @@ describe("database connection pool exhaustion", () => {
     await initDatabase();
 
     const callback = vi.fn().mockImplementation(async () => {
-      attempt++;
       throw new Error("Unique constraint violation");
     });
 

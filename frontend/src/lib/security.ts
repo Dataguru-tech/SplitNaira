@@ -34,23 +34,26 @@ export function escapeHtml(text: string): string {
  * @returns Sanitized text safe for display
  */
 export function sanitizeText(text: string): string {
-  // First escape HTML
-  let sanitized = escapeHtml(text);
+  let sanitized = text;
 
-  // Remove any remaining suspicious patterns in case validation was bypassed
+  // Strip active content before escaping so dangerous words/attributes do not
+  // survive as user-visible residue after HTML encoding.
   const dangerousPatterns = [
+    /<\/?\s*(script|style|iframe|form|object|embed|svg|body)[^>]*>/gi,
+    /\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi,
     /javascript:/gi,
     /vbscript:/gi,
-    /on\w+\s*=/gi, // event handlers
-    /<script/gi,
-    /eval\(/gi,
+    /data:text\/html/gi,
+    /expression\s*\([^)]*\)/gi,
+    /eval\s*\([^)]*\)/gi,
+    /alert\s*\([^)]*\)/gi,
   ];
 
   for (const pattern of dangerousPatterns) {
     sanitized = sanitized.replace(pattern, "");
   }
 
-  return sanitized;
+  return escapeHtml(sanitized);
 }
 
 /**
@@ -63,12 +66,14 @@ export function sanitizeText(text: string): string {
 export function isSafeText(text: string): boolean {
   // Check for dangerous patterns
   const dangerousPatterns = [
-    /<script/i,
-    /onclick/i,
-    /onerror/i,
-    /onload/i,
+    /<\/?\s*(script|style|iframe|form|object|embed|svg|body)/i,
+    /\son\w+\s*=/i,
     /javascript:/i,
-    /eval\(/i,
+    /vbscript:/i,
+    /data:text\/html/i,
+    /expression\s*\(/i,
+    /eval\s*\(/i,
+    /alert\s*\(/i,
   ];
 
   return !dangerousPatterns.some((pattern) => pattern.test(text));

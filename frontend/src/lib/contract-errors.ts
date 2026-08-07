@@ -28,7 +28,11 @@ export const CONTRACT_ERROR_MESSAGES: Record<ContractErrorCode, string> = {
     "Distributions are paused by the contract admin. Deposits still work; try again after unpause.",
   [ContractErrors.InvalidRecipient]: "Withdrawal recipient must not be the contract itself.",
   [ContractErrors.NotACollaborator]: "Address is not registered as a collaborator on this project.",
-  [ContractErrors.TooManyCollaborators]: "Project has exceeded the maximum allowed number of collaborators."
+  [ContractErrors.TooManyCollaborators]: "Project has exceeded the maximum allowed number of collaborators.",
+  [ContractErrors.AccountingDiscrepancy]:
+    "Contract accounting detected a balance mismatch. Pause and review before retrying.",
+  [ContractErrors.InvalidMaxCollaborators]:
+    "Maximum collaborators must stay within the contract bounds."
 };
 
 const ERROR_CODE_BY_NAME = Object.fromEntries(

@@ -77,8 +77,6 @@ describe("Frontend Observability - Sentry & Retry Integrations", () => {
       }),
       pollTransaction: vi.fn(),
     } as unknown as rpc.Server;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockTx = {} as any;
 
     await expect(
@@ -109,8 +107,6 @@ describe("Frontend Observability - Sentry & Retry Integrations", () => {
         resultXdr: "AAAAAA...",
       }),
     } as unknown as rpc.Server;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockTx = {} as any;
 
     await expect(

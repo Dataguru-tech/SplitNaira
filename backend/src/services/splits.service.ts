@@ -282,25 +282,22 @@ export async function fetchProjectById(projectId: string) {
     return null;
   }
 
+  const balanceRetval = await simulateReadOnlyContractCall(
+    "get_balance",
+    [nativeToScVal(projectId, { type: "symbol" })]
+  );
+  const balance = balanceRetval ? String(scValToNative(balanceRetval)) : "0";
   const project = scValToNative(retval) as unknown;
   const result =
-  project !== null && project !== undefined
-    ? {
-        ...(project as Record<string, unknown>),
-        balance,
-      }
-    : null;
+    project !== null && project !== undefined
+      ? {
+          ...(project as Record<string, unknown>),
+          balance,
+        }
+      : null;
   if (result !== null) {
     setCached(cacheKey, result);
   }
-  const balanceRetval = await simulateReadOnlyContractCall(
-  "get_balance",
-  [nativeToScVal(projectId, { type: "symbol" })]
-);
-
-const balance = balanceRetval
-  ? String(scValToNative(balanceRetval))
-  : "0";
   return result;
 }
 

@@ -42,10 +42,10 @@ export const splitSnakeCaseFixture: SplitResponseSnakeCase = {
 /**
  * Frontend client mapper function supporting both camelCase and legacy/snake_case API payloads.
  */
-export function mapSplitResponse(payload: Record<string, any>): SplitResponseCamelCase {
+export function mapSplitResponse(payload: Partial<SplitResponseCamelCase & SplitResponseSnakeCase>): SplitResponseCamelCase {
   return {
-    id: payload.id,
-    title: payload.title,
+    id: payload.id ?? '',
+    title: payload.title ?? '',
     targetAmount: payload.targetAmount ?? payload.target_amount ?? 0,
     totalRaised: payload.totalRaised ?? payload.total_raised ?? 0,
     createdAt: payload.createdAt ?? payload.created_at ?? '',

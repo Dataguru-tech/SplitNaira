@@ -20,6 +20,7 @@ export interface PayoutRecord {
 
 export interface PayoutHistoryIndex {
   getPayouts(filters?: PayoutFilters): Promise<PayoutRecord[]>;
+  getPayoutsWithCount(filters?: PayoutFilters): Promise<{ records: PayoutRecord[]; total: number }>;
   getPayoutById(id: string): Promise<PayoutRecord | null>;
   getPayoutsByRound(roundId: string): Promise<PayoutRecord[]>;
   getPayoutsByRecipient(recipient: string): Promise<PayoutRecord[]>;
@@ -82,7 +83,7 @@ export function createPayoutHistoryService(_config?: Partial<PayoutIndexConfig>)
       }
     },
 
-    async getPayoutsWithCount(filters) {
+    async getPayoutsWithCount(filters?: PayoutFilters) {
       try {
         const repo = getDataSource().getRepository(TransactionRecord);
         const query = repo.createQueryBuilder("transaction");

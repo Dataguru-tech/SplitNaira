@@ -54,7 +54,10 @@ export function BasisPointsPieChart({ collaborators, totalBasisPoints }: BasisPo
             {hasData && (
               <Tooltip
                 contentStyle={{ background: "#111110", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", fontSize: "11px" }}
-                formatter={(value: number) => [`${value.toLocaleString()} bp (${(value / 100).toFixed(2)}%)`, ""]}
+                formatter={(value) => {
+                  const numericValue = Number(value ?? 0);
+                  return [`${numericValue.toLocaleString()} bp (${(numericValue / 100).toFixed(2)}%)`, ""];
+                }}
               />
             )}
           </PieChart>

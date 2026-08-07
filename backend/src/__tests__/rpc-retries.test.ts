@@ -254,7 +254,7 @@ describe("RPC Retry and Timeout Policy", () => {
         // The unredacted `secret_key=<value>` / `xdr=<value>` patterns must
         // not appear in the log payload. Brackets are excluded from the
         // test pattern so the [REDACTED...] marker does NOT count as a hit.
-        expect(serialized).not.toMatch(/secret[_]?key\s*=\s*"?[^"\s,}\[\]]+"?/i);
+        expect(serialized).not.toMatch(new RegExp('secret[_]?key\\s*=\\s*"?[^"\\s,}\\[\\]]+"?', 'i'));
         expect(serialized).not.toMatch(/xdr\s*=\s*"?[A-Za-z0-9+/=]{12,}"?/i);
       }
     });
