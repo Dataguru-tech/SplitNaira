@@ -196,7 +196,7 @@ function redactSecrets(message: string): string {
   return redacted;
 }
 
-async function handleReadiness(_req: unknown, res: Response, next: NextFunction) {
+async function handleReadiness(_req: unknown, res: Response, _next: NextFunction) {
   const requestId = res.locals.requestId;
   const components: {
     env: { ok: boolean };

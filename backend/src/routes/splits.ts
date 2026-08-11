@@ -198,12 +198,14 @@ splitsRouter.get("/", async (req: Request, res: Response, next: NextFunction) =>
 
     const { start, limit, search, type } = parsed.data;
 
-    const { projects, total } = await listProjects(
+    const projects = await listProjects(
       start,
       limit,
       search,
       type
     );
+    const totalRetval = await simulateReadOnlyContractCall("get_project_count");
+    const total = totalRetval ? Number(scValToNative(totalRetval)) : projects.length;
 
     return res.status(200).json(
       serializeBigInts({
@@ -350,7 +352,8 @@ splitsRouter.post("/:projectId/deposit", async (req, res, next) => {
       const result = await buildDepositUnsignedXdr({
         projectId: parsedParams.data,
         from: parsedBody.data.from,
-        amount: parsedBody.data.amount
+        amount: parsedBody.data.amount,
+        token: parsedBody.data.token
       });
       // Evict cached project state; balance will change after submission
       invalidateCache(`project:${parsedParams.data}`);

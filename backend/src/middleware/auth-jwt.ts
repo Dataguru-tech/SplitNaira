@@ -19,10 +19,8 @@ declare global {
 
 const BEARER_PREFIX = "bearer ";
 
-// ASSUMPTION: walletAddress is an EVM-style address. Drop this regex (and
-// the check that uses it) if you support non-EVM chains or a different
-// address format.
-const EVM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+// SplitNaira authenticates Stellar account/contract addresses in JWTs.
+const STELLAR_ADDRESS_REGEX = /^[GC][A-Z2-7]{55}$/;
 
 export function authJwtMiddleware(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
@@ -70,5 +68,5 @@ function isAuthenticatedUser(payload: unknown): payload is AuthenticatedUser {
     return false;
   }
   const walletAddress = (payload as Record<string, unknown>).walletAddress;
-  return typeof walletAddress === "string" && EVM_ADDRESS_REGEX.test(walletAddress);
+  return typeof walletAddress === "string" && STELLAR_ADDRESS_REGEX.test(walletAddress);
 }

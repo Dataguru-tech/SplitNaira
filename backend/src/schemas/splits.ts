@@ -115,7 +115,8 @@ export const depositSchema = z.object({
   amount: z
     .number()
     .positive("amount must be greater than 0")
-    .describe("deposit amount in stroops")
+    .describe("deposit amount in stroops"),
+  token: stellarAddressSchema.describe("token")
 });
 
 export const updateMetadataSchema = z.object({

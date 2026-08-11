@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WalletNetworkGuard } from '../WalletNetworkGuard';
 import { useWallet } from '@/hooks/useWallet';
@@ -17,13 +17,19 @@ describe('WalletNetworkGuard — Unsupported Network States (#827)', () => {
   });
 
   const baseConnectedWallet = {
-    isConnected: true,
-    address: 'GABC1234567890123456789012345678901234567890123456789012',
-    network: 'TESTNET',
-    expectedNetwork: 'PUBLIC', // Mainnet expected
-    isSupportedNetwork: false,
-    disconnect: mockDisconnect,
-    switchNetwork: mockSwitchNetwork,
+    wallet: {
+      connected: true,
+      address: 'GABC1234567890123456789012345678901234567890123456789012',
+      network: 'PUBLIC',
+      expectedNetwork: 'TESTNET',
+      isSupportedNetwork: false,
+      disconnect: mockDisconnect,
+      switchNetwork: mockSwitchNetwork,
+    },
+    loading: false,
+    error: null,
+    connect: vi.fn(),
+    refresh: vi.fn(),
   };
 
   it('renders warning banner displaying active and expected networks when connected to an unsupported network', () => {
@@ -40,9 +46,9 @@ describe('WalletNetworkGuard — Unsupported Network States (#827)', () => {
     expect(banner).toBeInTheDocument();
 
     // Assert banner contains active and expected network strings
-    expect(banner).toHaveTextContent(/unsupported network/i);
-    expect(banner).toHaveTextContent(/active: testnet/i);
-    expect(banner).toHaveTextContent(/expected: public/i);
+    expect(banner).toHaveTextContent(/wrong network/i);
+    expect(banner).toHaveTextContent(/actual: public/i);
+    expect(banner).toHaveTextContent(/expected: testnet/i);
   });
 
   it('disables or guards action buttons while connected to an unsupported network', () => {
@@ -64,7 +70,9 @@ describe('WalletNetworkGuard — Unsupported Network States (#827)', () => {
   });
 
   it('enables guarded actions and clears warning banner upon reconnect after network correction', async () => {
-    // 1. Initial render on unsupported network (TESTNET instead of PUBLIC)
+    vi.mocked(useWallet).mockReturnValue(baseConnectedWallet as any);
+
+    // 1. Initial render on unsupported network (PUBLIC instead of TESTNET)
     const { rerender } = render(
       <WalletNetworkGuard>
         <button onClick={mockGuardedAction}>Submit Split Payment</button>
@@ -74,11 +82,13 @@ describe('WalletNetworkGuard — Unsupported Network States (#827)', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /submit split payment/i })).toBeDisabled();
 
-    // 2. Mock network switch / reconnection event correcting network state to PUBLIC
+    // 2. Mock network switch / reconnection event correcting network state to TESTNET
     const correctedWallet = {
       ...baseConnectedWallet,
-      network: 'PUBLIC',
-      isSupportedNetwork: true,
+      wallet: {
+        ...baseConnectedWallet.wallet,
+          network: 'TESTNET',
+      },
     };
     vi.mocked(useWallet).mockReturnValue(correctedWallet as any);
 

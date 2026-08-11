@@ -31,7 +31,7 @@ function verifyReadmeErrorCodes() {
   }));
 
   const missing = codes.filter(({ name, code }) => {
-    const linePattern = new RegExp(`- \\\`${code}\\\` \\\`${name}\\\``);
+    const linePattern = new RegExp("- `" + code + "` `" + name + "`");
     return !linePattern.test(readme);
   });
 
@@ -44,29 +44,26 @@ function verifyReadmeErrorCodes() {
   }
 }
 
-function gitDiff(paths) {
+function snapshot(paths) {
+  return new Map(paths.map((path) => [path, read(path)]));
+}
+
+function verifyUnchanged(paths, before) {
+  const changed = paths.filter((path) => read(path) !== before.get(path));
+  if (changed.length === 0) return;
+
+  console.error(
+    "[verify:data-integrity] Generated artifacts are out of date. Run:\n" +
+      "  npm run generate:contract-interface\n" +
+      "  npm run generate:contract-types\n" +
+      "Then commit the updated files."
+  );
   try {
-    return execSync(`git diff --exit-code -- ${paths.join(" ")}`, {
-      cwd: repoRoot,
-      encoding: "utf8"
-    });
-  } catch (error) {
-    if (error.status === 1) {
-      console.error(
-        "[verify:data-integrity] Generated artifacts are out of date. Run:\n" +
-          "  npm run generate:contract-interface\n" +
-          "  npm run generate:contract-types\n" +
-          "Then commit the updated files."
-      );
-      try {
-        execSync(`git diff -- ${paths.join(" ")}`, { cwd: repoRoot, stdio: "inherit" });
-      } catch {
-        /* ignore */
-      }
-      process.exit(1);
-    }
-    throw error;
+    execSync(`git diff -- ${changed.join(" ")}`, { cwd: repoRoot, stdio: "inherit" });
+  } catch {
+    /* ignore */
   }
+  process.exit(1);
 }
 
 console.log("SplitNaira data integrity verification");
@@ -75,15 +72,19 @@ console.log("====================================");
 verifyReadmeErrorCodes();
 console.log("✓ contracts/README.md error table matches errors.rs");
 
+const interfacePaths = ["contracts/interface/splitnaira.contract-interface.json"];
+const interfaceBefore = snapshot(interfacePaths);
 run("node contracts/scripts/generate-interface.mjs");
-gitDiff(["contracts/interface/splitnaira.contract-interface.json"]);
+verifyUnchanged(interfacePaths, interfaceBefore);
 console.log("✓ contract interface artifact is current");
 
-run("node scripts/generate-contract-types.mjs");
-gitDiff([
+const typePaths = [
   "backend/src/generated/contract-types.ts",
   "frontend/src/generated/contract-types.ts"
-]);
+];
+const typesBefore = snapshot(typePaths);
+run("node scripts/generate-contract-types.mjs");
+verifyUnchanged(typePaths, typesBefore);
 console.log("✓ generated contract types match interface artifact");
 
 console.log("\nAll data integrity checks passed.");

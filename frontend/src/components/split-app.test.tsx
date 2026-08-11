@@ -856,7 +856,7 @@ describe("SplitApp UX — skeleton loaders (#322)", () => {
     renderSplitApp();
     await user.click(screen.getByRole("button", { name: "Projects" }));
 
-    expect(document.querySelectorAll(".glass-card.rounded-\\[2\\.5rem\\].p-8.animate-pulse").length).toBeGreaterThan(0);
+    expect(screen.getByRole("status", { name: "Loading projects" })).toBeTruthy();
 
     resolveList([baseProject]);
     expect(await screen.findByText("Project One")).toBeTruthy();

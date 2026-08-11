@@ -96,6 +96,7 @@ export function resetRequestMetrics(): void {
   distributionsExecutedTotal = 0;
   depositsReceivedTotal = 0;
   sseConnectionsActive = 0;
+  rpcRetryAttemptsByKey.clear();
   rpcRetryAttemptsTotal = 0;
   rpcRetryDurationMsTotal = 0;
   rpcRetryMaxAttemptsReachedTotal = 0;

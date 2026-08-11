@@ -461,7 +461,6 @@ export function SplitApp({
       if (submitResponse.status === "ERROR")
         throw new Error(submitResponse.errorResult?.toString() ?? "Transaction failed.");
       notify.success("Project metadata updated successfully.");
-      void onFetchProject();
     } catch (error) {
       patchProjectInAllViews(projectId, previousSnapshot);
       setIsEditingMetadata(true);
@@ -989,7 +988,6 @@ export function SplitApp({
     if (activeTab === "dashboard") {
       void onFetchDashboardData();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet.address]);
 
   useEffect(() => {
@@ -1538,4 +1536,3 @@ export function SplitApp({
     </main>
   );
 }
-

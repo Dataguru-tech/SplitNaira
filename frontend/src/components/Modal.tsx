@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import "./Modal.css";
 import { useFocusTrap } from "./useFocusTrap";
 
@@ -21,16 +21,18 @@ export default function Modal({
   const modalRef = useRef<HTMLDivElement>(null);
   const lastFocusedElement = useRef<HTMLElement | null>(null);
 
-  useFocusTrap(modalRef, isOpen);
 
-  // Save & restore focus
-  useEffect(() => {
+  // Save & restore focus before the trap moves focus into the dialog.
+  useLayoutEffect(() => {
     if (isOpen) {
       lastFocusedElement.current = document.activeElement as HTMLElement;
-    } else {
-      lastFocusedElement.current?.focus();
+      return;
     }
+
+    lastFocusedElement.current?.focus();
   }, [isOpen]);
+
+  useFocusTrap(modalRef, isOpen);
 
   // Escape key handler
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function Modal({
 
         <div className="modal-body">{children}</div>
 
-        <button className="modal-close" onClick={onClose}>
+        <button className="modal-close" onClick={onClose} tabIndex={-1}>
           Close
         </button>
       </div>

@@ -196,7 +196,10 @@ export class ApiClient {
       // Retry on 429 (rate limit) and all 5xx server errors
       return err.status === 429 || err.isServerError;
     }
-    // Retry on network/timeout errors
+    if (err instanceof Error && /timed out/i.test(err.message)) {
+      return false;
+    }
+    // Retry on transient network errors.
     return true;
   }
 
@@ -209,14 +212,25 @@ export class ApiClient {
       return await withRetry(
         async () => {
           const timeout = init?.timeout ?? this.defaultTimeout;
+          const { timeout: _timeout, ...fetchInit } = init ?? {};
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
           try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
-              ...init,
-              signal: controller.signal,
-            });
+            const timeoutError = new Error(`Request timed out after ${timeout}ms: ${path}`);
+            const response = await Promise.race([
+              fetch(`${this.baseUrl}${path}`, {
+                ...fetchInit,
+                signal: controller.signal,
+              }),
+              new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                  controller.abort();
+                  reject(timeoutError);
+                }, timeout);
+              }),
+            ]);
+
             const body = (await response.json().catch(() => null)) as unknown;
             if (!response.ok) {
               throw this.toApiError(response.status, body, fallbackMessage);
@@ -228,7 +242,7 @@ export class ApiClient {
             }
             throw err;
           } finally {
-            clearTimeout(timeoutId);
+            if (timeoutId) clearTimeout(timeoutId);
           }
         },
         3,
@@ -576,22 +590,36 @@ function normalizeSystemStatus(
     : { status: "ok", message };
 }
 
+function stringFrom(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function numberFrom(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function booleanFrom(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
 function mapProjectToCamelCase(p: Record<string, unknown>): SplitProject {
-  if (!p) return p as unknown as SplitProject;
+  const collaborators = Array.isArray(p.collaborators)
+    ? (p.collaborators as Record<string, unknown>[])
+    : [];
+
   return {
-    projectId: p.projectId ?? p.project_id ?? "",
-    title: p.title ?? "",
-    projectType: p.projectType ?? p.project_type ?? "",
-    token: p.token ?? "",
-    owner: p.owner ?? "",
-    locked: p.locked ?? false,
-    balance: p.balance ?? "0",
-    totalDistributed: p.totalDistributed ?? p.total_distributed ?? "0",
-    distributionRound: p.distributionRound ?? p.distribution_round ?? 0,
-    collaborators: ((p.collaborators as Record<string, unknown>[]) ?? []).map((c) => ({
-      address: (c.address as string) ?? "",
-      alias: (c.alias as string) ?? "",
-      basisPoints: (c.basisPoints as number) ?? (c.basis_points as number) ?? 0,
+    projectId: stringFrom(p.projectId ?? p.project_id),
+    title: stringFrom(p.title),
+    projectType: stringFrom(p.projectType ?? p.project_type),
+    token: stringFrom(p.token),
+    owner: stringFrom(p.owner),
+    locked: booleanFrom(p.locked),
+    balance: stringFrom(p.balance, "0"),
+    totalDistributed: stringFrom(p.totalDistributed ?? p.total_distributed, "0"),
+    distributionRound: numberFrom(p.distributionRound ?? p.distribution_round),
+    collaborators: collaborators.map((c) => ({
+      address: stringFrom(c.address),
+      alias: stringFrom(c.alias),
+      basisPoints: numberFrom(c.basisPoints ?? c.basis_points),
     })),
   };
 }

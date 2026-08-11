@@ -38,7 +38,23 @@ export interface SplitProject {
 export interface ClaimableInfo {
   /** Total amount claimed (paid out) to this collaborator across all rounds */
   claimed: string;
-  /** Number of distribution rounds completed for this project */
+  /** Push-based `distribute` rounds only (not `claim`). */
+  distribution_round: number;
+  /** Most recent `claim` payout amount for this collaborator. */
+  last_claim_amount: string;
+}
+
+
+export interface ProjectSummary {
+  /** Unique project identifier */
+  project_id: string;
+  /** Human-readable title */
+  title: string;
+  /** Project owner */
+  owner: string;
+  /** Whether collaborator configuration is immutable */
+  locked: boolean;
+  /** Number of completed distributions */
   distribution_round: number;
 }
 
@@ -54,6 +70,11 @@ export type Pause_distributionsArgs = {
 
 export type Unpause_distributionsArgs = {
   admin: string;
+};
+
+export type Set_max_collaboratorsArgs = {
+  admin: string;
+  value: number;
 };
 
 export type Allow_tokenArgs = {
@@ -127,6 +148,11 @@ export type List_projectsArgs = {
   limit: number;
 };
 
+export type List_project_summariesArgs = {
+  start: number;
+  limit: number;
+};
+
 export type Get_balanceArgs = {
   project_id: string;
 };
@@ -156,6 +182,10 @@ export type Get_project_idsArgs = {
   limit: number;
 };
 
+export type Migrate_flat_to_bucketsArgs = {
+  admin: string;
+};
+
 export type Get_claimableArgs = {
   project_id: string;
   collaborator: string;
@@ -176,39 +206,39 @@ export type Transfer_project_ownershipArgs = {
 
 // Event Types
 
-export interface Project_createdEvent {
+export interface ProjectCreatedEvent {
   project_id: string;
   owner: string;
 }
 
-export interface Project_lockedEvent {
+export interface ProjectLockedEvent {
   project_id: string;
 }
 
-export interface Payment_sentEvent {
+export interface PaymentSentEvent {
   project_id: string;
   recipient: string;
   amount: string;
 }
 
-export interface Distribution_completeEvent {
+export interface DistributionCompleteEvent {
   project_id: string;
   round: number;
   total: string;
 }
 
-export interface Deposit_receivedEvent {
+export interface DepositReceivedEvent {
   project_id: string;
   from: string;
   amount: string;
   project_balance: string;
 }
 
-export interface Metadata_updatedEvent {
+export interface MetadataUpdatedEvent {
   project_id: string;
 }
 
-export interface Unallocated_withdrawnEvent {
+export interface UnallocatedWithdrawnEvent {
   token: string;
   admin: string;
   to: string;
@@ -216,44 +246,50 @@ export interface Unallocated_withdrawnEvent {
   remaining_unallocated: string;
 }
 
-export interface Ownership_transferredEvent {
+export interface OwnershipTransferredEvent {
   project_id: string;
   previous_owner: string;
   new_owner: string;
 }
 
-export interface Collaborators_updatedEvent {
+export interface CollaboratorsUpdatedEvent {
   project_id: string;
 }
 
-export interface Distributions_pausedEvent {
+export interface DistributionsPausedEvent {
   admin: string;
 }
 
-export interface Distributions_unpausedEvent {
+export interface DistributionsUnpausedEvent {
   admin: string;
 }
 
-export interface Collaborator_claimedEvent {
+export interface CollaboratorClaimedEvent {
   project_id: string;
   claimer: string;
   amount: string;
   distribution_round: number;
 }
 
-export interface Splits_updated_with_pending_balanceEvent {
+export interface SplitsUpdatedWithPendingBalanceEvent {
   project_id: string;
   pending_balance: string;
 }
 
-export interface Token_allowedEvent {
+export interface TokenAllowedEvent {
   token: string;
   admin: string;
 }
 
-export interface Token_disallowedEvent {
+export interface TokenDisallowedEvent {
   token: string;
   admin: string;
+}
+
+export interface Accounting_discrepancyEvent {
+  token: string;
+  contract_balance: string;
+  accounted_balance: string;
 }
 
 // Error Types
@@ -261,23 +297,25 @@ export interface Token_disallowedEvent {
 export const ContractErrors = {
   ProjectExists: 1,
   NotFound: 2,
+  AlreadyLocked: 8,
+  ProjectLocked: 9,
   Unauthorized: 3,
+  NotACollaborator: 18,
   InvalidSplit: 4,
   TooFewCollaborators: 5,
   ZeroShare: 6,
-  NoBalance: 7,
-  AlreadyLocked: 8,
-  ProjectLocked: 9,
   DuplicateCollaborator: 10,
   InvalidAmount: 11,
-  TokenNotAllowed: 12,
-  AdminNotSet: 13,
-  ArithmeticOverflow: 14,
-  InsufficientUnallocated: 15,
-  DistributionsPaused: 16,
   InvalidRecipient: 17,
-  NotACollaborator: 18,
   TooManyCollaborators: 19,
+  NoBalance: 7,
+  TokenNotAllowed: 12,
+  InsufficientUnallocated: 15,
+  AdminNotSet: 13,
+  DistributionsPaused: 16,
+  AccountingDiscrepancy: 20,
+  InvalidMaxCollaborators: 21,
+  ArithmeticOverflow: 14,
 } as const;
 
 export type ContractErrorCode = typeof ContractErrors[keyof typeof ContractErrors];

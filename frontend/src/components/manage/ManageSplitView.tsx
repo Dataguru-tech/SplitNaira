@@ -9,7 +9,6 @@ import type { WalletState } from "@/lib/wallet";
 import { Input } from "../Input";
 import { ListSkeleton, ProjectDetailSkeleton } from "../Skeleton";
 import { TransactionReceiptView, type TransactionReceipt } from "../TransactionReceiptView";
-import { BasisPointsPieChart, type PieChartEntry } from "../BasisPointsPieChart";
 
 interface CollaboratorInput {
   id: string;
@@ -219,7 +218,7 @@ export function ManageSplitView({
               </h3>
               <div className="relative space-y-4 before:absolute before:left-[19px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-white/10 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {isLoadingHistory ? (
-                  <ListSkeleton count={4} />
+                  <ListSkeleton rows={4} />
                 ) : history.length > 0 ? (
                   history.map((item) => (
                     <div key={item.id} className="relative pl-10 group">

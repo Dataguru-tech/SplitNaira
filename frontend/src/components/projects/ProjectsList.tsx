@@ -150,7 +150,7 @@ export function ProjectsList({
           </div>
 
           {isLoadingProjectsList && projectsList.length === 0 ? (
-            <DashboardGridSkeleton count={4} />
+            <DashboardGridSkeleton />
           ) : filteredProjectsList.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 animate-in fade-in">
               {filteredProjectsList.map((p) => (
@@ -288,7 +288,7 @@ export function ProjectsList({
                 </h3>
                 <div className="relative space-y-4 before:absolute before:left-[19px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-white/10 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                   {isLoadingHistory ? (
-                    <ListSkeleton count={4} />
+                    <ListSkeleton rows={4} />
                   ) : history.length > 0 ? (
                     history.map((item) => (
                       <div key={item.id} className="relative pl-10 group">

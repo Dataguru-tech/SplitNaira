@@ -11,7 +11,7 @@
 
 import express from "express";
 import request from "supertest";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { requestIdMiddleware } from "../middleware/request-id.js";
 import { errorHandler } from "../middleware/error.js";
 

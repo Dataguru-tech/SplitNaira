@@ -33,6 +33,9 @@ export function MobileDrawer({ isOpen, onClose, children }: MobileDrawerProps) {
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
+
+  if (!isOpen) return null;
+
   return (
     <>
       {/* Backdrop */}

@@ -11,7 +11,7 @@ const VALID_ENV: Record<string, string> = {
   NEXT_PUBLIC_CONTRACT_ID: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 };
 
-const ENV_KEYS = Object.keys(VALID_ENV);
+const ENV_KEYS = [...Object.keys(VALID_ENV), "NEXT_PUBLIC_NETWORK", "NEXT_PUBLIC_TX_POLL_TIMEOUT"];
 let savedEnv: Record<string, string | undefined>;
 
 // ─── Setup / teardown ─────────────────────────────────────────────────────────
@@ -62,9 +62,9 @@ describe("validateEnv()", () => {
   });
 
   it("accepts legacy NEXT_PUBLIC_NETWORK as an alias for NEXT_PUBLIC_STELLAR_NETWORK", () => {
+    const { NEXT_PUBLIC_STELLAR_NETWORK: _omit, ...rest } = VALID_ENV;
     Object.assign(process.env, {
-      ...VALID_ENV,
-      NEXT_PUBLIC_STELLAR_NETWORK: undefined as unknown as string,
+      ...rest,
       NEXT_PUBLIC_NETWORK: "mainnet",
     });
     const env = validateEnv();

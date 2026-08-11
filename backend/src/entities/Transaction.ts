@@ -38,7 +38,7 @@ export class TransactionRecord {
   })
   timestamp!: number;
 
-  @Index({ unique: true })
+  @Index("IDX_transactions_tx_hash", { unique: true })
   @Column({ type: "varchar", length: 128, unique: true })
   txHash!: string;
 

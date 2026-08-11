@@ -18,8 +18,8 @@ function parseDatabaseUrl(url) {
   return {
     host: parsed.hostname,
     port: parsed.port || "5432",
-    user: decodedURIComponent(parsed.username),
-    password: decodedURIComponent(parsed.password),
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
     database: parsed.pathname.replace(/^\/+/, "") || "postgres",
   };
 }

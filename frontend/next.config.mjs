@@ -1,8 +1,11 @@
-/* global process */
 import createNextIntlPlugin from "next-intl/plugin";
 import { withSentryConfig } from "@sentry/nextjs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+const workspaceRoot = path.resolve(configDir, "..");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -10,6 +13,9 @@ const nextConfig = {
   ...(process.env.VERCEL ? {} : { output: "standalone" }),
   experimental: {
     optimizePackageImports: ["clsx"],
+  },
+  turbopack: {
+    root: workspaceRoot,
   },
   async rewrites() {
     return [

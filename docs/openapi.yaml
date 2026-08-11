@@ -6,6 +6,17 @@ info:
 servers:
   - url: http://localhost:3001
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT obtained from POST /users/login
+    adminApiKey:
+      type: apiKey
+      in: header
+      name: x-admin-api-key
+      description: Payments admin API key for /splits/admin mutation endpoints
   schemas:
     ApiError:
       type: object
@@ -266,7 +277,8 @@ components:
           type: string
         details:
           type: object
-          additionalProperties: {}
+          additionalProperties:
+            nullable: true
         components:
           type: object
           properties:
@@ -279,7 +291,8 @@ components:
                   type: string
                 details:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties:
+                    nullable: true
               required:
                 - ok
             db:
@@ -291,7 +304,8 @@ components:
                   type: string
                 details:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties:
+                    nullable: true
               required:
                 - ok
             cache:
@@ -303,7 +317,8 @@ components:
                   type: string
                 details:
                   type: object
-                  additionalProperties: {}
+                  additionalProperties:
+                    nullable: true
               required:
                 - ok
             deploy:
@@ -746,9 +761,14 @@ paths:
                   minimum: 0
                   exclusiveMinimum: true
                   description: deposit amount in stroops
+                token:
+                  type: string
+                  minLength: 1
+                  description: token
               required:
                 - from
                 - amount
+                - token
             example:
               from: GCZTK3PNYXCVF7Z3ELVELEJZ7BVGPGPVJ3NVZNI7O6DVCHPA4JU6LXRV
               amount: 50000000

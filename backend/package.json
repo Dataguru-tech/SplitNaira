@@ -20,7 +20,8 @@
     "typeorm": "node --import tsx ./node_modules/typeorm/cli.js",
     "migration:run": "npm run typeorm -- migration:run -d src/data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
-    "validate:deploy-config": "tsx src/utils/deploy-config.ts validate"
+    "validate:deploy-config": "tsx src/utils/deploy-config.ts validate",
+    "migration:dry-run": "node scripts/run-migration-dry-run.mjs"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",

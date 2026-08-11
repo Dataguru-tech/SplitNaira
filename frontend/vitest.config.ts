@@ -4,7 +4,14 @@ import path from "node:path";
 export default defineConfig({
   test: {
     environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"]
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+    exclude: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "src/common/**",
+      "src/features/data-integrity/**"
+    ]
   },
   resolve: {
     alias: {

@@ -15,7 +15,7 @@ export {
   type SystemStatusResponse,
 } from "./api-client";
 
-import { ApiClient, type ListProjectsParams } from "./api-client";
+import { ApiClient, type ListProjectsParams, type SystemStatusResponse } from "./api-client";
 import type { SplitProject, Collaborator } from "./stellar";
 
 const client = new ApiClient();

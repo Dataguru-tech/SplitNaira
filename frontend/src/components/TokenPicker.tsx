@@ -70,7 +70,7 @@ export function TokenPicker({
   // handler runs, so reading it would give us the new focus target, not
   // the previous one.
   const handleFocusCapture = (
-    event: React.FocusEvent<HTMLDivElement>,
+    event: React.FocusEvent<HTMLElement>,
   ) => {
     if (previouslyFocusedRef.current !== null) return;
     const related = event.relatedTarget as HTMLElement | null;
@@ -96,8 +96,7 @@ export function TokenPicker({
       // so screen-reader users don't lose their navigation context.
       restoreFocus();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+}, []);
 
   const handleSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const nextValue = event.target.value;
@@ -149,8 +148,6 @@ export function TokenPicker({
     <div
       className="space-y-3 md:col-span-2"
       aria-disabled={disabled || undefined}
-      onKeyDown={handlePickerKeyDown}
-      onFocus={handleFocusCapture}
     >
       <div className="space-y-2">
         <label
@@ -165,6 +162,8 @@ export function TokenPicker({
           id={selectId}
           value={selectedValue}
           onChange={handleSelectChange}
+          onKeyDown={handlePickerKeyDown}
+          onFocus={handleFocusCapture}
           disabled={disabled}
           required={required}
           aria-required={required || undefined}
@@ -204,6 +203,8 @@ export function TokenPicker({
             type="text"
             value={customToken}
             onChange={handleCustomChange}
+            onKeyDown={handlePickerKeyDown}
+            onFocus={handleFocusCapture}
             disabled={disabled}
             required={required && isCustom}
             aria-required={(required && isCustom) || undefined}

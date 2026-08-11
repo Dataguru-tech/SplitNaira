@@ -54,9 +54,12 @@ function scrubSecrets(obj: Record<string, unknown>): Record<string, unknown> {
 // Mutates info in-place so Winston's internal Symbol properties are preserved.
 const scrubFormat = winston.format((info) => {
   const reserved = new Set(["level", "message", "timestamp", "splat"]);
-  for (const key of Object.keys(info)) {
+  const record = info as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
     if (!reserved.has(key) && SCRUB_KEYS.has(key.toLowerCase())) {
-      (info as Record<string, unknown>)[key] = "[REDACTED]";
+      record[key] = "[REDACTED]";
+    } else if (!reserved.has(key) && record[key] !== null && typeof record[key] === "object" && !Array.isArray(record[key])) {
+      record[key] = scrubSecrets(record[key] as Record<string, unknown>);
     }
   }
   return info;

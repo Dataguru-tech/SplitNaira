@@ -9,7 +9,7 @@
  */
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactElement } from "react";
 import { getExplorerUrl, getExplorerLabel } from "@/lib/stellar";
 import { useTransactionStatus } from "@/hooks/useTransactionStatus";
 import { CopyHashButton } from "./CopyHashButton";
@@ -88,7 +88,7 @@ const ACTION_COPY: Record<TransactionReceipt["action"], ActionCopy> = {
   },
 };
 
-const ICONS: Record<TransactionReceipt["action"], JSX.Element> = {
+const ICONS: Record<TransactionReceipt["action"], ReactElement> = {
   create: (
     <path
       strokeLinecap="round"

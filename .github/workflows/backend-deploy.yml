@@ -36,9 +36,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      - name: Install dependencies
+        working-directory: .
+        run: npm ci --no-audit --no-fund
       - name: Validate data integrity
-        run: cd .. && npm run verify:data-integrity
+        working-directory: .
+        run: npm run verify:data-integrity
       - run: npm run lint
       - run: npm run build
       - run: npm run test
@@ -126,4 +129,3 @@ jobs:
       - name: Skip smoke check when BACKEND_SMOKE_URL is unset
         if: vars.BACKEND_SMOKE_URL == ''
         run: echo "BACKEND_SMOKE_URL not configured — skipping post-deploy smoke check."
-

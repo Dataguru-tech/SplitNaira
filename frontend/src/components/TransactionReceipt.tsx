@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Clock, Copy, RefreshCw, ExternalLink } from 'lucide-react';
-import { TxStatus } from '../hooks/useTransactionStatus';
+
+type TxStatus = 'pending' | 'success' | 'failed' | 'expired';
 
 interface TransactionReceiptProps {
   status: TxStatus;
@@ -82,9 +83,9 @@ export const TransactionReceipt: React.FC<TransactionReceiptProps> = ({
               type="button"
               onClick={handleCopyHash}
               className="p-1.5 hover:bg-[#26282E] rounded text-gray-400 hover:text-white transition-colors"
-              aria-label="Copy transaction hash"
+              aria-label={copied ? "Transaction hash copied" : "Copy transaction hash"}
             >
-              <Copy className="w-4 h-4" />
+              {copied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </button>
             <a
               href={`${explorerUrl}/${txHash}`}

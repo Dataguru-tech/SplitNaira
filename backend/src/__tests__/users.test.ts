@@ -7,7 +7,7 @@ import { requestIdMiddleware } from "../middleware/request-id.js";
 import { signToken } from "../services/jwt.js";
 
 const findOneMock = vi.fn();
-const existMock = vi.fn();
+const existsMock = vi.fn();
 const createMock = vi.fn();
 const saveMock = vi.fn();
 const commitMock = vi.fn();
@@ -18,7 +18,7 @@ vi.mock("../services/database.js", () => ({
   getDataSource: () => ({
     getRepository: () => ({
       findOne: findOneMock,
-      exist: existMock,
+      exists: existsMock,
       create: createMock,
       save: saveMock
     })
@@ -34,7 +34,7 @@ vi.mock("../services/database.js", () => ({
   }) => Promise<unknown>) => {
     const repository = {
       findOne: findOneMock,
-      exist: existMock,
+      exists: existsMock,
       create: createMock,
       save: saveMock
     };
@@ -74,7 +74,7 @@ describe("User Registration API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockImplementation((input) => input);
-    existMock.mockResolvedValue(false);
+    existsMock.mockResolvedValue(false);
     saveMock.mockImplementation(async (input) => ({
       id: "11111111-1111-4111-8111-111111111111",
       role: "customer",
@@ -138,7 +138,7 @@ describe("User Registration API", () => {
     });
 
     it("should reject duplicate wallet address", async () => {
-      existMock.mockResolvedValue(true);
+      existsMock.mockResolvedValue(true);
       const app = createApp();
 
       const response = await request(app)
