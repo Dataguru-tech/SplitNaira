@@ -45,7 +45,7 @@ export function decodeCursor(cursor: string): number {
   const decoded = Buffer.from(cursor, "base64").toString("utf8");
   const num = Number(decoded);
   if (!Number.isInteger(num) || num < 0) {
-    throw new Error("Invalid cursor");
+    throw new RequestValidationError("Invalid cursor");
   }
   return num;
 }

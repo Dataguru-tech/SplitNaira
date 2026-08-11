@@ -119,7 +119,9 @@ describe("database connection pool exhaustion", () => {
 
     await initDatabase();
 
+    let attempt = 0;
     const callback = vi.fn().mockImplementation(async () => {
+      attempt++;
       if (attempt < 3) {
         const err = new Error("deadlock detected") as Error & { code: string };
         err.code = "40P01";

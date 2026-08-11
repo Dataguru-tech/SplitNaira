@@ -49,7 +49,7 @@ describe("contract interface artifact", () => {
     expect(contractInterface.generatedBy).toBe("contracts/scripts/generate-interface.mjs");
     expect(contractInterface.methods.length).toBeGreaterThanOrEqual(27);
     expect(contractInterface.events.length).toBeGreaterThanOrEqual(7);
-    expect(contractInterface.errors).toHaveLength(19);
+    expect(contractInterface.errors).toHaveLength(21);
   });
 
   it("covers backend write and read contract calls", () => {
@@ -89,20 +89,28 @@ describe("contract interface artifact", () => {
   });
 
   it("keeps app event handling aligned with on-chain topics and data", () => {
-    expect(contractEvent("distribution_complete")).toMatchObject({
+    expect(contractEvent("DistributionComplete")).toMatchObject({
       topics: [
-        { position: 0, type: "Symbol", value: "distribution_complete" },
-        { position: 1, type: "from_field", field: "project_id" }
+        { position: 0, type: "Symbol", value: "DistributionComplete" },
+        { position: 1, type: "from_field", field: null }
       ],
-      data: { tupleFields: ["round", "total"] }
+      fields: [
+        expect.objectContaining({ name: "project_id", type: "Symbol" }),
+        expect.objectContaining({ name: "round", type: "u32" }),
+        expect.objectContaining({ name: "total", type: "i128" })
+      ]
     });
 
-    expect(contractEvent("payment_sent")).toMatchObject({
+    expect(contractEvent("PaymentSent")).toMatchObject({
       topics: [
-        { position: 0, type: "Symbol", value: "payment_sent" },
-        { position: 1, type: "from_field", field: "project_id" }
+        { position: 0, type: "Symbol", value: "PaymentSent" },
+        { position: 1, type: "from_field", field: null }
       ],
-      data: { tupleFields: ["recipient", "amount"] }
+      fields: [
+        expect.objectContaining({ name: "project_id", type: "Symbol" }),
+        expect.objectContaining({ name: "recipient", type: "Address" }),
+        expect.objectContaining({ name: "amount", type: "i128" })
+      ]
     });
   });
 

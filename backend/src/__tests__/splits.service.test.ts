@@ -1,14 +1,16 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildDepositUnsignedXdr } from "../services/splits.service.js";
 
-// Mock the splits service to return a specific project configuration
-vi.mock("../services/splits.service.js", async (importOriginal) => {
-  const actual = await importOriginal<any>();
+vi.mock("../services/stellar.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/stellar.js")>();
   return {
     ...actual,
-    fetchProjectById: vi.fn().mockResolvedValue({
-      token: "PROJECT_TOKEN_ADDRESS"
-    })
+    getCached: vi.fn((key: string) =>
+      key === "project:test_project"
+        ? { token: "PROJECT_TOKEN_ADDRESS" }
+        : undefined,
+    ),
+    setCached: vi.fn(),
   };
 });
 

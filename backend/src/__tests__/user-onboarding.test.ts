@@ -17,6 +17,7 @@ import { requestIdMiddleware } from "../middleware/request-id.js";
 // ── Database mock ─────────────────────────────────────────────────────────────
 
 const findOneMock = vi.fn();
+const existsMock = vi.fn();
 const createMock = vi.fn();
 const saveMock = vi.fn();
 const commitMock = vi.fn();
@@ -26,6 +27,7 @@ vi.mock("../services/database.js", () => ({
   getDataSource: () => ({
     getRepository: () => ({
       findOne: findOneMock,
+      exists: existsMock,
       create: createMock,
       save: saveMock,
     }),
@@ -41,7 +43,7 @@ vi.mock("../services/database.js", () => ({
       };
     }) => Promise<unknown>,
   ) => {
-    const repo = { findOne: findOneMock, create: createMock, save: saveMock };
+    const repo = { findOne: findOneMock, exists: existsMock, create: createMock, save: saveMock };
     const mockQR = {
       manager: { getRepository: () => repo },
       startTransaction: commitMock,
@@ -65,7 +67,7 @@ import { usersRouter } from "../routes/users.js";
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
 const VALID_WALLET = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
-const VALID_WALLET_2 = "GBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+const VALID_WALLET_2 = "GAFY5DYD3EEUWPHL2JHAWFOLKEI2IAQRAVW4Y3L6DLJQOXG2TAJMU7GC";
 const NOW = new Date("2026-06-01T10:00:00.000Z");
 
 function makeUser(overrides: Partial<Record<string, unknown>> = {}) {
@@ -98,6 +100,7 @@ describe("User Onboarding — full lifecycle (#515)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createMock.mockImplementation((input) => input);
+    existsMock.mockResolvedValue(false);
     saveMock.mockImplementation(async (input) => makeUser(input));
   });
 
@@ -118,7 +121,7 @@ describe("User Onboarding — full lifecycle (#515)", () => {
       expect(res.body.walletAddress).toBe(VALID_WALLET);
       expect(res.body.email).toBe("user@example.com");
       expect(res.body.alias).toBe("TestUser");
-      expect(res.body.role).toBe("user");
+      expect(res.body.role).toBe("customer");
       expect(res.body.isActive).toBe(true);
       expect(res.body).toHaveProperty("id");
       expect(res.body).toHaveProperty("createdAt");
@@ -156,26 +159,27 @@ describe("User Onboarding — full lifecycle (#515)", () => {
 
   describe("POST /users/register — duplicate guard", () => {
     it("rejects registration when wallet address already exists", async () => {
-      findOneMock.mockResolvedValue(makeUser());
+      existsMock.mockResolvedValue(true);
       const app = createApp();
 
       const res = await request(app)
         .post("/users/register")
         .send({ walletAddress: VALID_WALLET });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(409);
       expect(res.body.error).toBeDefined();
     });
 
-    it("rolls back the transaction on duplicate detection", async () => {
-      findOneMock.mockResolvedValue(makeUser());
+    it("does not open a transaction on duplicate detection", async () => {
+      existsMock.mockResolvedValue(true);
       const app = createApp();
 
       await request(app)
         .post("/users/register")
         .send({ walletAddress: VALID_WALLET });
 
-      expect(rollbackMock).toHaveBeenCalled();
+      expect(commitMock).not.toHaveBeenCalled();
+      expect(rollbackMock).not.toHaveBeenCalled();
     });
   });
 

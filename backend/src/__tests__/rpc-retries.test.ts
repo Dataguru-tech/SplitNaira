@@ -220,6 +220,7 @@ describe("RPC Retry and Timeout Policy", () => {
     });
 
     it("records a success outcome so dashboards can compute success rate", async () => {
+      resetRequestMetrics();
       const operation = vi.fn().mockResolvedValue("ok");
 
       await executeWithRetry(operation, {

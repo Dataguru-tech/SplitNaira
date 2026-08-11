@@ -196,7 +196,10 @@ export class ApiClient {
       // Retry on 429 (rate limit) and all 5xx server errors
       return err.status === 429 || err.isServerError;
     }
-    // Retry on network/timeout errors
+    if (err instanceof Error && /timed out/i.test(err.message)) {
+      return false;
+    }
+    // Retry on transient network errors.
     return true;
   }
 
@@ -209,14 +212,25 @@ export class ApiClient {
       return await withRetry(
         async () => {
           const timeout = init?.timeout ?? this.defaultTimeout;
+          const { timeout: _timeout, ...fetchInit } = init ?? {};
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
           try {
-            const response = await fetch(`${this.baseUrl}${path}`, {
-              ...init,
-              signal: controller.signal,
-            });
+            const timeoutError = new Error(`Request timed out after ${timeout}ms: ${path}`);
+            const response = await Promise.race([
+              fetch(`${this.baseUrl}${path}`, {
+                ...fetchInit,
+                signal: controller.signal,
+              }),
+              new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => {
+                  controller.abort();
+                  reject(timeoutError);
+                }, timeout);
+              }),
+            ]);
+
             const body = (await response.json().catch(() => null)) as unknown;
             if (!response.ok) {
               throw this.toApiError(response.status, body, fallbackMessage);
@@ -228,7 +242,7 @@ export class ApiClient {
             }
             throw err;
           } finally {
-            clearTimeout(timeoutId);
+            if (timeoutId) clearTimeout(timeoutId);
           }
         },
         3,

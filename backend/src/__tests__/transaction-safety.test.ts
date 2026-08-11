@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DataSource, QueryRunner } from "typeorm";
-import { withTransaction } from "../services/database.js";
+import { setDataSourceForTests, withTransaction } from "../services/database.js";
 
 describe("Transaction Safety - withTransaction", () => {
   let mockDataSource: DataSource;
@@ -33,10 +33,7 @@ describe("Transaction Safety - withTransaction", () => {
       isInitialized: true,
     } as unknown as DataSource;
 
-    // Mock getDataSource to return our mock
-    vi.mock("../services/database.js", () => ({
-      getDataSource: () => mockDataSource,
-    }));
+    setDataSourceForTests(mockDataSource);
   });
 
   it("should successfully execute and commit transaction", async () => {

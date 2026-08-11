@@ -30,15 +30,18 @@ vi.mock("@stellar/stellar-sdk", () => {
 
   return {
     Address: {
-      fromString: vi.fn((address: string) => ({
-        toScVal: () => ({ address }),
-      })),
+      fromString: vi.fn((address: string) => {
+        if (!/^[GC][A-Z0-9_]+$/.test(address)) throw new Error("invalid address");
+        return {
+          toScVal: () => ({ address }),
+        };
+      }),
     },
     BASE_FEE: 100,
-    Contract: vi.fn().mockImplementation(() => ({
+    Contract: vi.fn().mockImplementation(function () { return {
       call: (method: string, ...args: unknown[]) => ({ method, args }),
-    })),
-    TransactionBuilder: vi.fn().mockImplementation(() => ({
+    }; }),
+    TransactionBuilder: vi.fn().mockImplementation(function () { return {
       addOperation: function (op: unknown) {
         this.op = op;
         return this;
@@ -49,13 +52,13 @@ vi.mock("@stellar/stellar-sdk", () => {
       build: function () {
         return { preparedOperation: this.op };
       },
-    })),
+    }; }),
     nativeToScVal: vi.fn((value: unknown) => ({
       toXDR: () => `MOCKED_XDR_${value}`,
     })),
     scValToNative: vi.fn((value: unknown) => value),
     rpc: {
-      Server: vi.fn(() => serverMock),
+      Server: vi.fn().mockImplementation(function () { return serverMock; }),
     },
     xdr: {
       ScVal: {
@@ -271,11 +274,17 @@ describe("splits routes integration", () => {
 
   it("fetches a project by id", async () => {
     getAccountMock.mockResolvedValue({ accountId: "GSIM" });
-    simulateTransactionMock.mockResolvedValue({
-      result: {
-        retval: { projectId: "project_1", title: "Project 1" },
-      },
-    });
+    simulateTransactionMock
+      .mockResolvedValueOnce({
+        result: {
+          retval: { projectId: "project_1", title: "Project 1" },
+        },
+      })
+      .mockResolvedValueOnce({
+        result: {
+          retval: 123,
+        },
+      });
 
     const app = createApp();
 
@@ -284,6 +293,7 @@ describe("splits routes integration", () => {
     expect(response.body).toEqual({
       projectId: "project_1",
       title: "Project 1",
+      balance: "123",
     });
     expect(getAccountMock).toHaveBeenCalledWith("GTESTSIMULATOR");
   });

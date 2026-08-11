@@ -14,20 +14,20 @@ vi.mock("@stellar/stellar-sdk", () => {
       }))
     },
     BASE_FEE: "100",
-    Contract: vi.fn().mockImplementation(() => ({
+    Contract: vi.fn().mockImplementation(function () { return {
       call: vi.fn().mockReturnValue({})
-    })),
-    TransactionBuilder: vi.fn().mockImplementation(() => ({
+    }; }),
+    TransactionBuilder: vi.fn().mockImplementation(function () { return {
       addOperation: vi.fn().mockReturnThis(),
       setTimeout: vi.fn().mockReturnThis(),
       build: vi.fn().mockReturnValue({
         toXDR: () => "test_xdr"
       })
-    })),
+    }; }),
     nativeToScVal: vi.fn((val) => ({ val })),
     scValToNative: vi.fn((val) => val),
     rpc: {
-      Server: vi.fn().mockImplementation(() => ({
+      Server: vi.fn().mockImplementation(function () { return {
         getAccount: vi.fn().mockResolvedValue({
           accountId: () => "GD5T6IPRNCKFOHQ3STZ5BTEYI5V6U5U6U5U6U5U6U5U6U5U6U5U6U5U6",
           sequenceNumber: () => "1",
@@ -39,7 +39,7 @@ vi.mock("@stellar/stellar-sdk", () => {
           sequence: "1",
           fee: "100"
         })
-      }))
+      }; })
     },
     xdr: {
       ScVal: {
@@ -149,7 +149,7 @@ describe("Route Integration Tests", () => {
       expect(res.body.status).toBe("ready");
       expect(res.body.components).toBeDefined();
       expect(res.body.components.env.ok).toBe(true);
-      expect(res.body.components.db.ok).toBe(true);
+      expect(res.body.components.db.status).toBe("up");
     });
   });
 
@@ -206,7 +206,7 @@ describe("Route Integration Tests", () => {
 
       expect(res.status).toBe(503);
       expect(res.body.error).toBe("rpc_unavailable");
-      expect(res.body.components.rpc.ok).toBe(false);
+      expect(res.body.components.rpc.status).toBe("down");
     });
 
     it("should return 503 when contract simulation fails", async () => {
@@ -219,7 +219,7 @@ describe("Route Integration Tests", () => {
 
       expect(res.status).toBe(503);
       expect(res.body.error).toBe("contract_unreachable");
-      expect(res.body.components.contract.ok).toBe(false);
+      expect(res.body.components.contract.status).toBe("down");
     });
   });
 

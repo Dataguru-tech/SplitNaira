@@ -155,7 +155,7 @@ export function DashboardView({
             <SummaryCardSkeleton />
           </div>
         ) : (
-          <>
+          <div className="glass-card rounded-[2.5rem] p-8 md:p-10 border border-greenBright/10">
           <div className="flex flex-wrap items-start justify-between gap-6">
             <div className="space-y-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-greenBright/80">
@@ -308,7 +308,7 @@ export function DashboardView({
               </div>
             )}
           </div>
-        </>
+          </div>
         ))}
 
       {/* Emergency / Unallocated recovery console */}

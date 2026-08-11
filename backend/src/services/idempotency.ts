@@ -26,7 +26,7 @@ export class IdempotencyStore {
 
   constructor(
     private readonly ttlMs: number = DEFAULT_TTL_MS,
-    private readonly now: () => number = Date.now
+    private readonly now: () => number = () => Date.now()
   ) {}
 
   private buildKey(scope: string, key: string): string {

@@ -5,8 +5,11 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, isOpen: boolean
     if (!isOpen || !ref.current) return;
 
     const modal = ref.current;
-    
-    // Find all focusable elements
+    const previousTabIndex = modal.getAttribute("tabindex");
+    if (previousTabIndex === null) {
+      modal.setAttribute("tabindex", "-1");
+    }
+
     const getFocusableElements = () => {
       return Array.from(
         modal.querySelectorAll<HTMLElement>(
@@ -15,7 +18,6 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, isOpen: boolean
       ).filter((el) => el.getAttribute("tabindex") !== "-1");
     };
 
-    // Auto-focus the first element
     const focusable = getFocusableElements();
     if (focusable.length > 0) {
       focusable[0].focus();
@@ -29,6 +31,7 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, isOpen: boolean
       const elements = getFocusableElements();
       if (elements.length === 0) {
         e.preventDefault();
+        modal.focus();
         return;
       }
 
@@ -36,23 +39,24 @@ export function useFocusTrap(ref: RefObject<HTMLElement | null>, isOpen: boolean
       const lastEl = elements[elements.length - 1];
 
       if (e.shiftKey) {
-        // Shift + Tab -> reverse wrap
         if (document.activeElement === firstEl || document.activeElement === modal) {
           lastEl.focus();
           e.preventDefault();
         }
-      } else {
-        // Tab -> forward wrap
-        if (document.activeElement === lastEl) {
-          firstEl.focus();
-          e.preventDefault();
-        }
+      } else if (document.activeElement === lastEl) {
+        firstEl.focus();
+        e.preventDefault();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      if (previousTabIndex === null) {
+        modal.removeAttribute("tabindex");
+      } else {
+        modal.setAttribute("tabindex", previousTabIndex);
+      }
     };
   }, [isOpen, ref]);
 }

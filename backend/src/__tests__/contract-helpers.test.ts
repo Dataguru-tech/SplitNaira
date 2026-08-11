@@ -7,7 +7,7 @@ describe("toCollaboratorScVal", () => {
     
     expect(() => {
       toCollaboratorScVal({
-        address: "GDTM6Q3ZGE4A4I7V2B2D7N4X2O4YI6L4S4Z4L6U3Y6V4Q2Z2F4E2K4M4",
+        address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
         alias: longAlias,
         basisPoints: 5000
       });
@@ -19,7 +19,7 @@ describe("toCollaboratorScVal", () => {
     
     expect(() => {
       toCollaboratorScVal({
-        address: "GDTM6Q3ZGE4A4I7V2B2D7N4X2O4YI6L4S4Z4L6U3Y6V4Q2Z2F4E2K4M4",
+        address: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
         alias: validAlias,
         basisPoints: 5000
       });

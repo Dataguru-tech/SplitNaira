@@ -461,7 +461,6 @@ export function SplitApp({
       if (submitResponse.status === "ERROR")
         throw new Error(submitResponse.errorResult?.toString() ?? "Transaction failed.");
       notify.success("Project metadata updated successfully.");
-      void onFetchProject();
     } catch (error) {
       patchProjectInAllViews(projectId, previousSnapshot);
       setIsEditingMetadata(true);

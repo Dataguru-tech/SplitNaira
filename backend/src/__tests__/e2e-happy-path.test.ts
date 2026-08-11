@@ -65,10 +65,10 @@ vi.mock("@stellar/stellar-sdk", () => {
       }))
     },
     BASE_FEE: 100,
-    Contract: vi.fn().mockImplementation(() => ({
+    Contract: vi.fn().mockImplementation(function () { return {
       call: (method: string, ...args: unknown[]) => ({ method, args })
-    })),
-    TransactionBuilder: vi.fn().mockImplementation(() => ({
+    }; }),
+    TransactionBuilder: vi.fn().mockImplementation(function () { return {
       addOperation: function (op: unknown) {
         this.op = op;
         return this;
@@ -79,11 +79,11 @@ vi.mock("@stellar/stellar-sdk", () => {
       build: function () {
         return { preparedOperation: this.op };
       }
-    })),
+    }; }),
     nativeToScVal: realNativeToScVal,
     scValToNative: realScValToNative,
     rpc: {
-      Server: vi.fn(() => serverMock)
+      Server: vi.fn().mockImplementation(function () { return serverMock; })
     },
     xdr: {
       ScVal: {

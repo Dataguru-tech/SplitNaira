@@ -12,7 +12,7 @@ describe("IdempotencyStore (Issue #888)", () => {
     store.markInProgress("POST:/splits", "key-1", "hash-a");
 
     const record = store.get("POST:/splits", "key-1");
-    expect(record).toEqual({ requestHash: "hash-a", status: "in_progress" });
+    expect(record).toEqual({ requestHash: "hash-a", status: "in_progress", expiresAt: 1000 });
   });
 
   it("returns a completed record with statusCode/body after complete", () => {
@@ -26,6 +26,7 @@ describe("IdempotencyStore (Issue #888)", () => {
       status: "completed",
       statusCode: 200,
       body: { xdr: "XDR" },
+      expiresAt: 1000,
     });
   });
 

@@ -69,6 +69,14 @@ export async function initDatabase(): Promise<DataSource> {
   return initializationPromise;
 }
 
+
+export function setDataSourceForTests(dataSource: DataSource | null): void {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("setDataSourceForTests is only available in test mode.");
+  }
+  AppDataSource = dataSource;
+  initializationPromise = null;
+}
 export function getDataSource(): DataSource {
   if (!AppDataSource?.isInitialized) {
     throw new Error("Database not initialized. Call initDatabase() first.");
