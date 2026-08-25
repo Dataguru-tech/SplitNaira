@@ -14,6 +14,9 @@ export const CollaboratorSchema = z.object({
   address: StellarAddressSchema,
   alias: z.string().min(1, "Alias is required"),
   basisPoints: z.string().refine((val) => {
+    if (typeof val === "string" && (val.includes(".") || !/^\d+$/.test(val.trim()))) {
+      return false;
+    }
     const num = parseInt(val, 10);
     return !isNaN(num) && num > 0 && num <= 10000;
   }, "Basis points must be between 1 and 10,000"),
