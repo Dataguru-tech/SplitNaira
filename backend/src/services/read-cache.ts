@@ -2,6 +2,10 @@
  * Bounded TTL cache for read-only Soroban simulation results.
  * Prevents unbounded memory growth while reducing RPC load under read-heavy traffic.
  * Uses LRU eviction: the least recently accessed entry is removed when capacity is full.
+ *
+ * Issue #1033: Supports in-flight coalescing — when multiple concurrent callers
+ * request the same cache key while the upstream call is still pending, they all
+ * await the same Promise instead of firing duplicate RPC requests.
  */
 
 export interface ReadCacheOptions {
@@ -29,6 +33,8 @@ export class ReadCache {
   private readonly defaultTtlMs: number;
   private readonly maxEntries: number;
   private readonly store = new Map<string, CacheEntry<unknown>>();
+  /** Issue #1033: tracks in-flight promises per cache key for coalescing. */
+  private readonly inflight = new Map<string, Promise<unknown>>();
   private hits = 0;
   private misses = 0;
 
@@ -53,6 +59,39 @@ export class ReadCache {
     this.store.delete(key);
     this.store.set(key, entry);
     return entry.value;
+  }
+
+  /**
+   * Issue #1033: Returns a cached value if present, or coalesces concurrent
+   * callers onto the same in-flight Promise. The `fetcher` is only called
+   * once per cache key while a prior call is still pending.
+   *
+   * When the fetcher resolves successfully, the result is cached with the
+   * default TTL. When it rejects, the in-flight entry is removed so
+   * subsequent callers can retry.
+   */
+  async getOrFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    const cached = this.get<T>(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const existing = this.inflight.get(key) as Promise<T> | undefined;
+    if (existing) {
+      return existing;
+    }
+
+    const promise = fetcher()
+      .then((value) => {
+        this.set(key, value);
+        return value;
+      })
+      .finally(() => {
+        this.inflight.delete(key);
+      });
+
+    this.inflight.set(key, promise);
+    return promise;
   }
 
   set<T>(key: string, value: T, ttlMs = this.defaultTtlMs): void {
@@ -80,6 +119,7 @@ export class ReadCache {
 
   clear(): void {
     this.store.clear();
+    this.inflight.clear();
   }
 
   stats(): ReadCacheStats {

@@ -3,14 +3,20 @@ import { buildDepositUnsignedXdr } from "../services/splits.service.js";
 
 vi.mock("../services/stellar.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/stellar.js")>();
+  const cacheStore = new Map<string, unknown>([
+    ["project:test_project", { token: "PROJECT_TOKEN_ADDRESS" }],
+  ]);
   return {
     ...actual,
-    getCached: vi.fn((key: string) =>
-      key === "project:test_project"
-        ? { token: "PROJECT_TOKEN_ADDRESS" }
-        : undefined,
-    ),
-    setCached: vi.fn(),
+    getCached: vi.fn((key: string) => cacheStore.get(key)),
+    setCached: vi.fn((key: string, value: unknown) => { cacheStore.set(key, value); }),
+    getCachedOrFetch: vi.fn(async (key: string, fetcher: () => Promise<unknown>) => {
+      const cached = cacheStore.get(key);
+      if (cached !== undefined) return cached;
+      const value = await fetcher();
+      cacheStore.set(key, value);
+      return value;
+    }),
   };
 });
 
