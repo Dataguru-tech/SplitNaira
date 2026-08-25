@@ -20,7 +20,7 @@ This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Sp
 - ✅ Whitelist approach: Only allows alphanumeric, spaces, basic punctuation
 - ✅ Pattern blocking: Rejects `<script>`, `onclick`, `javascript:`, `eval(`, etc.
 - ✅ Case-insensitive detection for common XSS patterns
-- ✅ Comprehensive error messages for rejected inputs
+- ✅ Comprehensive error messages for rejected inputs,
 
 ### 2. Security Test Suite (`backend/src/__tests__/security-xss.test.ts`)
 

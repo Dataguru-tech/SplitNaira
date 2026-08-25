@@ -8,7 +8,7 @@ Thank you for your interest in contributing to **SplitNaira** — a royalty dist
 <!-- This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Split Description Field) by implementing comprehensive XSS prevention across the entire application using a 3-layer defense strategy. --> -->
 
 
-## 📋 Table of Contents
+## 📋 Table of Contents,
 
 <!-- - [Code of Conduct](#code-of-conduct) -->
 - [How Can I Contribute?](#how-can-i-contribute)
