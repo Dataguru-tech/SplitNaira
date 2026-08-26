@@ -13,7 +13,7 @@ This fix addresses GitHub Issue #292 (Security: Cross-Site Scripting (XSS) in Sp
 
 <!-- This report confirms the successful implementation of production-safe rendering and API sanitization to eliminate XSS vulnerabilities in the Split Naira platform. -->
 
----
+---,
 
 ## Acceptance Criteria Verification
 
