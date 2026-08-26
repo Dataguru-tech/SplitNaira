@@ -4778,3 +4778,295 @@ fn test_toomany_collaborators_error_code_is_stable() {
     assert_eq!(SplitError::TooManyCollaborators.code(), 19);
     assert_eq!(SplitError::TooFewCollaborators.code(), 5);
 }
+
+// ============================================================
+//  ISSUE 1121: COLLABORATOR ALIAS MAXIMUM LENGTH REGRESSION TESTS
+// ============================================================
+
+#[test]
+fn test_collaborator_alias_at_maximum_length() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    let max_alias = "A".repeat(100);
+    let collabs = vec![
+        &env,
+        Collaborator {
+            address: alice.clone(),
+            alias: String::from_str(&env, &max_alias),
+            basis_points: 5000,
+        },
+        Collaborator {
+            address: bob.clone(),
+            alias: String::from_str(&env, "Bob"),
+            basis_points: 5000,
+        },
+    ];
+
+    client.create_project(
+        &owner,
+        &Symbol::new(&env, "max_alias"),
+        &String::from_str(&env, "Max Alias Project"),
+        &String::from_str(&env, "music"),
+        &token,
+        &collabs,
+    );
+
+    let project = client.get_project(&Symbol::new(&env, "max_alias"));
+    assert_eq!(project.collaborators.len(), 2);
+    let retrieved_alias = project.collaborators.get(0).unwrap().alias.to_string();
+    assert_eq!(retrieved_alias, max_alias);
+}
+
+#[test]
+fn test_update_collaborators_with_maximum_length_aliases() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let owner = Address::generate(&env);
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    let initial = make_equal_collaborators(&env, 2);
+    client.create_project(
+        &owner,
+        &Symbol::new(&env, "update_alias"),
+        &String::from_str(&env, "Update Alias"),
+        &String::from_str(&env, "music"),
+        &token,
+        &initial,
+    );
+
+    let max_alias = "X".repeat(100);
+    let updated = vec![
+        &env,
+        Collaborator {
+            address: alice.clone(),
+            alias: String::from_str(&env, &max_alias),
+            basis_points: 5000,
+        },
+        Collaborator {
+            address: bob.clone(),
+            alias: String::from_str(&env, "Y".repeat(100).as_str()),
+            basis_points: 5000,
+        },
+    ];
+
+    client.update_collaborators(
+        &Symbol::new(&env, "update_alias"),
+        &owner,
+        &updated,
+    );
+
+    let project = client.get_project(&Symbol::new(&env, "update_alias"));
+    let first_alias = project.collaborators.get(0).unwrap().alias.to_string();
+    assert_eq!(first_alias.len(), 100);
+    assert_eq!(first_alias, max_alias);
+}
+
+// ============================================================
+//  ISSUE 1118: PAUSE/UNPAUSE ADMIN TRANSITION INVARIANT TESTS
+// ============================================================
+
+#[test]
+fn test_pause_unpause_transition_state_consistency() {
+    let (env, _admin, _token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    assert!(!client.is_distributions_paused());
+
+    client.pause_distributions(&admin);
+    assert!(client.is_distributions_paused());
+
+    client.unpause_distributions(&admin);
+    assert!(!client.is_distributions_paused());
+
+    client.pause_distributions(&admin);
+    assert!(client.is_distributions_paused());
+
+    client.pause_distributions(&admin);
+    assert!(client.is_distributions_paused());
+}
+
+#[test]
+fn test_pause_unpause_idempotency() {
+    let (env, _admin, _token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    assert!(!client.is_distributions_paused());
+
+    client.pause_distributions(&admin);
+    assert!(client.is_distributions_paused());
+    client.pause_distributions(&admin);
+    assert!(client.is_distributions_paused());
+
+    client.unpause_distributions(&admin);
+    assert!(!client.is_distributions_paused());
+    client.unpause_distributions(&admin);
+    assert!(!client.is_distributions_paused());
+}
+
+#[test]
+fn test_pause_unpause_admin_transition_requires_authorization() {
+    let (env, _admin, _token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    let unauthorized = Address::generate(&env);
+
+    let pause_result = client.try_pause_distributions(&unauthorized);
+    assert_eq!(pause_result, Err(Ok(SplitError::Unauthorized)));
+
+    let unpause_result = client.try_unpause_distributions(&unauthorized);
+    assert_eq!(unpause_result, Err(Ok(SplitError::Unauthorized)));
+}
+
+// ============================================================
+//  ISSUE 1120: EVENT SNAPSHOT TESTS FOR UNALLOCATED WITHDRAWAL
+// ============================================================
+
+#[test]
+fn test_withdraw_unallocated_emits_event_snapshot() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    let depositor = Address::generate(&env);
+    let withdrawer = Address::generate(&env);
+
+    let stellar_token = token::StellarAssetClient::new(&env, &token);
+    stellar_token.mint(&depositor, &1000_0000000i128);
+
+    client.deposit(&Symbol::new(&env, "non_existent"), &depositor, &1000_0000000i128);
+
+    let events_before = env.events().all();
+    let before_count = events_before.len();
+
+    client.withdraw_unallocated(&admin, &token, &withdrawer, &500_0000000i128);
+
+    let events_after = env.events().all();
+    assert!(events_after.len() > before_count, "Event should be emitted on withdrawal");
+}
+
+#[test]
+fn test_withdraw_unallocated_correct_balance_after_event() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    let depositor = Address::generate(&env);
+    let withdrawer = Address::generate(&env);
+
+    let stellar_token = token::StellarAssetClient::new(&env, &token);
+    stellar_token.mint(&depositor, &1000_0000000i128);
+
+    client.deposit(&Symbol::new(&env, "unalloc_1"), &depositor, &1000_0000000i128);
+
+    assert_eq!(client.get_unallocated_balance(&token), 1000_0000000i128);
+
+    client.withdraw_unallocated(&admin, &token, &withdrawer, &300_0000000i128);
+
+    assert_eq!(client.get_unallocated_balance(&token), 700_0000000i128);
+}
+
+// ============================================================
+//  ISSUE 1119: STORAGE TTL TESTS FOR TOKEN ALLOWLIST ENTRIES
+// ============================================================
+
+#[test]
+fn test_allowlist_add_token_extends_ttl() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    let new_token = Address::generate(&env);
+
+    client.add_allowed_token(&admin, &new_token);
+    assert!(client.is_token_allowed(&new_token));
+
+    env.ledger()
+        .with_mut(|info| info.sequence_number += 50_000);
+
+    assert!(client.is_token_allowed(&new_token));
+}
+
+#[test]
+fn test_allowlist_get_tokens_maintains_ttl() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    let token1 = Address::generate(&env);
+    let token2 = Address::generate(&env);
+
+    client.add_allowed_token(&admin, &token1);
+    client.add_allowed_token(&admin, &token2);
+
+    let allowed = client.get_allowed_tokens(&0, &10);
+    assert_eq!(allowed.len(), 2);
+
+    env.ledger()
+        .with_mut(|info| info.sequence_number += 75_000);
+
+    let allowed_after = client.get_allowed_tokens(&0, &10);
+    assert_eq!(allowed_after.len(), 2);
+}
+
+#[test]
+fn test_allowlist_persistence_across_ledger_advance() {
+    let (env, _admin, token) = create_test_env();
+    let contract_id = env.register_contract(None, SplitNairaContract);
+    let client = SplitNairaContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+
+    let token1 = Address::generate(&env);
+    let token2 = Address::generate(&env);
+    let token3 = Address::generate(&env);
+
+    client.add_allowed_token(&admin, &token1);
+    client.add_allowed_token(&admin, &token2);
+    client.add_allowed_token(&admin, &token3);
+
+    let allowed_before = client.get_allowed_tokens(&0, &10);
+    assert_eq!(allowed_before.len(), 3);
+
+    env.ledger()
+        .with_mut(|info| info.sequence_number += 100_000);
+
+    let allowed_after = client.get_allowed_tokens(&0, &10);
+    assert_eq!(allowed_after.len(), 3);
+    assert!(client.is_token_allowed(&token1));
+    assert!(client.is_token_allowed(&token2));
+    assert!(client.is_token_allowed(&token3));
+}
