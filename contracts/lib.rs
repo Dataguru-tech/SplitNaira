@@ -1,4 +1,4 @@
-﻿#![no_std]
+#![no_std]
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, panic_with_error, token, Address, Env, Map, String, Symbol, Vec,
@@ -44,6 +44,8 @@ mod authorization_tests;
 mod address_validation_tests;
 #[cfg(test)]
 mod ttl_renewal_tests;
+#[cfg(test)]
+mod cost_benchmark_tests;
 
 use errors::SplitError;
 

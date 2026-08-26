@@ -256,6 +256,8 @@ export function CreateSplitWizard({
                     min={0}
                     max={10_000}
                     placeholder="5000"
+                    aria-invalid={Boolean(basisPointsError)}
+                    aria-describedby={basisPointsError ? `bp-error-${field.id}` : undefined}
                     className={clsx(
                       "glass-input w-full rounded-xl px-4 py-3 text-sm",
                       basisPointsError ? "border-red-500/50 bg-red-500/5" : "",
@@ -263,6 +265,9 @@ export function CreateSplitWizard({
                     {...register(`collaborators.${index}.basisPoints`, {
                       required: "Share is required.",
                       validate: (value) => {
+                        if (typeof value === "string" && (value.includes(".") || !/^\d+$/.test(value.trim()))) {
+                          return "Share must be a whole integer in basis points.";
+                        }
                         const parsed = Number.parseInt(value, 10);
                         if (!Number.isFinite(parsed) || parsed < 0) return "Share must be a valid number.";
                         if (parsed > 10_000) return "Share cannot exceed 10,000.";
@@ -271,7 +276,7 @@ export function CreateSplitWizard({
                     })}
                   />
                   {basisPointsError && (
-                    <p className="px-1 text-[10px] font-bold text-red-400 uppercase tracking-tighter">
+                    <p id={`bp-error-${field.id}`} role="alert" className="px-1 text-[10px] font-bold text-red-400 uppercase tracking-tighter">
                       {basisPointsError}
                     </p>
                   )}
@@ -293,8 +298,24 @@ export function CreateSplitWizard({
           })}
         </div>
         <div className="flex flex-col items-end gap-3 px-4 py-6 rounded-3xl bg-white/2 border border-white/5">
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] uppercase text-muted">Allocation Matrix</span>
+          <div className="flex flex-wrap items-center justify-between w-full gap-4">
+            <div className="space-y-1">
+              <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-muted">Allocation Matrix</span>
+              <p
+                role="status"
+                aria-live="polite"
+                className={clsx(
+                  "text-xs font-semibold",
+                  totalBasisPoints === 10000 ? "text-greenBright" : "text-red-400",
+                )}
+              >
+                {totalBasisPoints === 10000
+                  ? "Total shares valid: 100% allocated"
+                  : totalBasisPoints < 10000
+                    ? `Under-allocated: ${(10000 - totalBasisPoints).toLocaleString()} BP remaining`
+                    : `Over-allocated: ${(totalBasisPoints - 10000).toLocaleString()} BP over limit`}
+              </p>
+            </div>
             <div
               className={clsx(
                 "rounded-lg px-4 py-2 font-mono text-sm font-bold",
