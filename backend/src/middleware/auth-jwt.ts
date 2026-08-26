@@ -29,13 +29,15 @@ export function authJwtMiddleware(req: Request, res: Response, next: NextFunctio
   // "bearer", "Bearer", "BEARER" should all be accepted. The original
   // startsWith("Bearer ") would silently reject a valid token sent with
   // different casing by a client that doesn't happen to title-case it.
+  const requestId = res.locals.requestId as string | undefined;
+
   if (!header || !header.toLowerCase().startsWith(BEARER_PREFIX)) {
-    return res.status(401).json({ error: "unauthorized", message: "Missing or invalid token." });
+    return res.status(401).json({ error: "unauthorized", code: "UNAUTHORIZED", message: "Missing or invalid token.", requestId, details: {} });
   }
 
   const token = header.slice(BEARER_PREFIX.length).trim();
   if (!token) {
-    return res.status(401).json({ error: "unauthorized", message: "Missing or invalid token." });
+    return res.status(401).json({ error: "unauthorized", code: "UNAUTHORIZED", message: "Missing or invalid token.", requestId, details: {} });
   }
 
   let payload: unknown;
@@ -47,11 +49,11 @@ export function authJwtMiddleware(req: Request, res: Response, next: NextFunctio
     // with an unhandled exception instead of returning a clean 401.
     payload = verifyToken(token);
   } catch {
-    return res.status(401).json({ error: "unauthorized", message: "Token expired or invalid." });
+    return res.status(401).json({ error: "unauthorized", code: "UNAUTHORIZED", message: "Token expired or invalid.", requestId, details: {} });
   }
 
   if (!isAuthenticatedUser(payload)) {
-    return res.status(401).json({ error: "unauthorized", message: "Token expired or invalid." });
+    return res.status(401).json({ error: "unauthorized", code: "UNAUTHORIZED", message: "Token expired or invalid.", requestId, details: {} });
   }
 
   req.user = { walletAddress: payload.walletAddress };

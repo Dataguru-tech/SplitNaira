@@ -160,17 +160,25 @@ describe("Admin audit logging", () => {
     });
   });
 
-  it("does not create an audit log row for failed admin mutations", async () => {
+  it("creates an audit log row for failed admin mutations (validation failure)", async () => {
     const res = await request(app)
       .post("/splits/admin/pause-distributions")
       .set("x-admin-api-key", "ops-key")
       .send({});
 
     expect(res.status).toBe(400);
-    expect(mockAuditSave).not.toHaveBeenCalled();
+    expect(mockAuditSave).toHaveBeenCalledOnce();
+
+    const auditEntry = mockAuditCreate.mock.calls[0][0] as Record<string, unknown>;
+    expect(auditEntry.action).toBe("pause_distributions");
+    expect(auditEntry.requestId).toBeTruthy();
+    expect(auditEntry.payload).toMatchObject({
+      action: "pause_distributions",
+      statusCode: 400,
+    });
   });
 
-  it("does not create an audit log row for blocked admin writes", async () => {
+  it("creates an audit log row for blocked admin writes (write-disabled)", async () => {
     process.env.PAYMENTS_ADMIN_WRITE_ENABLED = "false";
     clearEnvCache();
 
@@ -182,6 +190,14 @@ describe("Admin audit logging", () => {
       });
 
     expect(res.status).toBe(503);
-    expect(mockAuditSave).not.toHaveBeenCalled();
+    expect(mockAuditSave).toHaveBeenCalledOnce();
+
+    const auditEntry = mockAuditCreate.mock.calls[0][0] as Record<string, unknown>;
+    expect(auditEntry.action).toBe("pause_distributions");
+    expect(auditEntry.requestId).toBeTruthy();
+    expect(auditEntry.payload).toMatchObject({
+      action: "pause_distributions",
+      statusCode: 503,
+    });
   });
 });

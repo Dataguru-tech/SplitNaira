@@ -315,6 +315,18 @@ export function invalidateCacheByPrefix(prefix: string): void {
   getReadCache().deleteByPrefix(prefix);
 }
 
+/**
+ * Issue #1033: Returns a cached value if present, or coalesces concurrent
+ * callers onto the same in-flight Promise. Only one upstream fetch is
+ * performed per cache key while a prior call is still pending.
+ */
+export async function getCachedOrFetch<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  return getReadCache().getOrFetch(key, fetcher);
+}
+
 export function getCacheStats(): { size: number; keys: string[] } {
   return getReadCache().stats();
 }

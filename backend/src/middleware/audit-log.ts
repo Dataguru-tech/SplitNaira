@@ -24,7 +24,20 @@ function buildPayload(req: Request): Record<string, unknown> | null {
   return { value: body };
 }
 
-async function persistAuditLog(req: Request, res: Response): Promise<void> {
+function buildFailureMetadata(req: Request, res: Response): Record<string, unknown> {
+  return {
+    action: deriveAction(req),
+    requestId: String(res.locals.requestId ?? ""),
+    route: req.originalUrl,
+    statusCode: res.statusCode,
+  };
+}
+
+async function persistAuditLog(
+  req: Request,
+  res: Response,
+  outcome: "success" | "failure"
+): Promise<void> {
   try {
     const dataSource = getDataSource();
     const repository = dataSource.getRepository(AuditLog);
@@ -32,7 +45,7 @@ async function persistAuditLog(req: Request, res: Response): Promise<void> {
       action: deriveAction(req),
       ipHash: hashIp(req.ip),
       requestId: String(res.locals.requestId ?? ""),
-      payload: buildPayload(req)
+      payload: outcome === "success" ? buildPayload(req) : buildFailureMetadata(req, res)
     });
     await repository.save(entry);
   } catch (error) {
@@ -41,8 +54,10 @@ async function persistAuditLog(req: Request, res: Response): Promise<void> {
 }
 
 /**
- * Records an audit log row after each successful admin mutation under /splits/admin.
- * Failed or rejected requests are not logged.
+ * Records an audit log row after each admin mutation under /splits/admin.
+ * Successful mutations (2xx) are logged with the request payload.
+ * Failed mutations (non-2xx) are logged with sanitized failure metadata
+ * (action, requestId, route, statusCode) — never raw headers or tokens.
  */
 export function auditAdminMutationsMiddleware(
   req: Request,
@@ -55,9 +70,10 @@ export function auditAdminMutationsMiddleware(
   }
 
   res.on("finish", () => {
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      void persistAuditLog(req, res);
-    }
+    const outcome = res.statusCode >= 200 && res.statusCode < 300
+      ? "success"
+      : "failure";
+    void persistAuditLog(req, res, outcome);
   });
 
   next();

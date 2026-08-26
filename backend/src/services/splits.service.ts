@@ -15,8 +15,7 @@ import {
   getStellarRpcServer,
   RequestValidationError,
   executeWithRetry,
-  getCached,
-  setCached,
+  getCachedOrFetch,
   type UnsignedTxResponse
 } from "./stellar.js";
 
@@ -178,41 +177,36 @@ export async function simulateReadOnlyContractCall(
 
 export async function fetchProjectsFromContract(start: number, limit: number) {
   const cacheKey = `list_projects:${start}:${limit}`;
-  const cached = getCached<unknown[]>(cacheKey);
-  if (cached !== undefined) {
-    return cached;
-  }
+  return getCachedOrFetch<unknown[]>(cacheKey, async () => {
+    const config = loadStellarConfig();
+    const server = getStellarRpcServer();
 
-  const config = loadStellarConfig();
-  const server = getStellarRpcServer();
+    let sourceAccount;
+    try {
+      sourceAccount = await executeWithRetry(() => server.getAccount(config.simulatorAccount));
+    } catch {
+      throw new RequestValidationError("simulator account not found on selected network");
+    }
 
-  let sourceAccount;
-  try {
-    sourceAccount = await executeWithRetry(() => server.getAccount(config.simulatorAccount));
-  } catch {
-    throw new RequestValidationError("simulator account not found on selected network");
-  }
+    const contract = new Contract(config.contractId);
+    const tx = new TransactionBuilder(sourceAccount, {
+      fee: BASE_FEE,
+      networkPassphrase: config.networkPassphrase
+    })
+      .addOperation(
+        contract.call("list_projects", xdr.ScVal.scvU32(start), xdr.ScVal.scvU32(limit))
+      )
+      .setTimeout(300)
+      .build();
 
-  const contract = new Contract(config.contractId);
-  const tx = new TransactionBuilder(sourceAccount, {
-    fee: BASE_FEE,
-    networkPassphrase: config.networkPassphrase
-  })
-    .addOperation(
-      contract.call("list_projects", xdr.ScVal.scvU32(start), xdr.ScVal.scvU32(limit))
-    )
-    .setTimeout(300)
-    .build();
+    const simulated = await executeWithRetry(() => server.simulateTransaction(tx));
+    const retval = "result" in simulated ? simulated.result?.retval : undefined;
+    if (!retval) {
+      return [];
+    }
 
-  const simulated = await executeWithRetry(() => server.simulateTransaction(tx));
-  const retval = "result" in simulated ? simulated.result?.retval : undefined;
-  if (!retval) {
-    return [];
-  }
-
-  const result = scValToNative(retval) as unknown[];
-  setCached(cacheKey, result);
-  return result;
+    return scValToNative(retval) as unknown[];
+  });
 }
 
 export async function listProjects(
@@ -252,53 +246,45 @@ export async function listProjects(
 
 export async function fetchProjectById(projectId: string) {
   const cacheKey = `project:${projectId}`;
-  const cached = getCached<unknown>(cacheKey);
-  if (cached !== undefined) {
-    return cached;
-  }
+  return getCachedOrFetch<unknown>(cacheKey, async () => {
+    const config = loadStellarConfig();
+    const server = getStellarRpcServer();
 
-  const config = loadStellarConfig();
-  const server = getStellarRpcServer();
+    let sourceAccount;
+    try {
+      sourceAccount = await executeWithRetry(() => server.getAccount(config.simulatorAccount));
+    } catch {
+      throw new RequestValidationError("simulator account not found on selected network");
+    }
 
-  let sourceAccount;
-  try {
-    sourceAccount = await executeWithRetry(() => server.getAccount(config.simulatorAccount));
-  } catch {
-    throw new RequestValidationError("simulator account not found on selected network");
-  }
+    const contract = new Contract(config.contractId);
+    const tx = new TransactionBuilder(sourceAccount, {
+      fee: BASE_FEE,
+      networkPassphrase: config.networkPassphrase
+    })
+      .addOperation(contract.call("get_project", nativeToScVal(projectId, { type: "symbol" })))
+      .setTimeout(300)
+      .build();
 
-  const contract = new Contract(config.contractId);
-  const tx = new TransactionBuilder(sourceAccount, {
-    fee: BASE_FEE,
-    networkPassphrase: config.networkPassphrase
-  })
-    .addOperation(contract.call("get_project", nativeToScVal(projectId, { type: "symbol" })))
-    .setTimeout(300)
-    .build();
+    const simulated = await executeWithRetry(() => server.simulateTransaction(tx));
+    const retval = "result" in simulated ? simulated.result?.retval : undefined;
+    if (!retval) {
+      return null;
+    }
 
-  const simulated = await executeWithRetry(() => server.simulateTransaction(tx));
-  const retval = "result" in simulated ? simulated.result?.retval : undefined;
-  if (!retval) {
-    return null;
-  }
-
-  const balanceRetval = await simulateReadOnlyContractCall(
-    "get_balance",
-    [nativeToScVal(projectId, { type: "symbol" })]
-  );
-  const balance = balanceRetval ? String(scValToNative(balanceRetval)) : "0";
-  const project = scValToNative(retval) as unknown;
-  const result =
-    project !== null && project !== undefined
+    const balanceRetval = await simulateReadOnlyContractCall(
+      "get_balance",
+      [nativeToScVal(projectId, { type: "symbol" })]
+    );
+    const balance = balanceRetval ? String(scValToNative(balanceRetval)) : "0";
+    const project = scValToNative(retval) as unknown;
+    return project !== null && project !== undefined
       ? {
           ...(project as Record<string, unknown>),
           balance,
         }
       : null;
-  if (result !== null) {
-    setCached(cacheKey, result);
-  }
-  return result;
+  });
 }
 
 export async function buildLockProjectUnsignedXdr(input: LockProjectRequest) {

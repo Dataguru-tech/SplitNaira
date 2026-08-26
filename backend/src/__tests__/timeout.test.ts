@@ -39,8 +39,10 @@ describe("requestTimeout middleware", () => {
     expect(res.status).toHaveBeenCalledWith(504);
     expect(res.json).toHaveBeenCalledWith({
       error: "gateway_timeout",
+      code: "GATEWAY_TIMEOUT",
       message: "Request timed out.",
       requestId: "test-correlation-id",
+      details: {},
     });
   });
 

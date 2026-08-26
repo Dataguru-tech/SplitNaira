@@ -6,11 +6,12 @@ export function requestTimeout(ms = DEFAULT_TIMEOUT_MS) {
   return (req: Request, res: Response, next: NextFunction) => {
     const timer = setTimeout(() => {
       if (!res.headersSent) {
-        const requestId = res.locals.requestId;
         res.status(504).json({
           error: "gateway_timeout",
+          code: "GATEWAY_TIMEOUT",
           message: "Request timed out.",
-          ...(requestId ? { requestId } : {}),
+          requestId: res.locals.requestId,
+          details: {},
         });
       }
     }, ms);

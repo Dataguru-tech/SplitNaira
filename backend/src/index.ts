@@ -115,9 +115,9 @@ app.use("/health", readLimiter);
 app.use(
   "/splits/admin",
   adminLimiter,
+  auditAdminMutationsMiddleware,
   requirePaymentsAdminAccess,
-  enforcePaymentsAdminWriteEnabled,
-  auditAdminMutationsMiddleware
+  enforcePaymentsAdminWriteEnabled
 );
 app.use("/splits", (req, res, next) => {
   if (req.method === "GET") return readLimiter(req, res, next);

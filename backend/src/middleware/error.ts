@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { randomUUID } from "crypto";
 import { ZodError } from "zod";
 import { AppError, ErrorCode, ErrorType } from "../lib/errors.js";
 import { logger } from "../services/logger.js";
@@ -17,11 +18,12 @@ function formatZodError(err: ZodError) {
 }
 
 export function notFoundHandler(req: Request, res: Response) {
+  const requestId = res.locals.requestId ?? randomUUID();
   res.status(404).json({
     error: "not_found",
     code: "NOT_FOUND",
     message: `Route not found: ${req.method} ${req.originalUrl}`,
-    requestId: res.locals.requestId,
+    requestId,
     details: {},
   });
 }
@@ -72,7 +74,15 @@ export function errorHandler(
     return next(err);
   }
 
-  const requestId = res.locals.requestId;
+  // Issue #1032: Every error response must carry a non-empty requestId.
+  // When a parse error fires before the requestId middleware has run,
+  // res.locals.requestId is undefined — generate one so the response is
+  // still correlatable.
+  const requestId = res.locals.requestId ?? randomUUID();
+  res.locals.requestId = requestId;
+  if (!res.getHeader("x-request-id")) {
+    res.setHeader("x-request-id", requestId);
+  }
 
   // Real instanceof check instead of duck-typing on err.name/err.issues —
   // ZodError is a real exported class, so this is both simpler and more
@@ -113,6 +123,26 @@ export function errorHandler(
         ...(err.details && typeof err.details === "object" ? err.details : {}),
         ...(err.remediation ? { remediation: err.remediation } : {}),
       },
+    });
+  }
+
+  // Express body-parser malformed-JSON (400) — thrown by express.json()
+  // when the request body contains invalid JSON syntax.  Handle it before
+  // the generic "unhandled error" path so clients always get a predictable
+  // 400 error shape instead of a 500.  (Issue #1028)
+  const parseError = err as { type?: string; status?: number; statusCode?: number; message?: string };
+  if (parseError.type === "entity.parse.failed") {
+    logger.warn("Malformed JSON payload", {
+      requestId,
+      path: req.originalUrl,
+      method: req.method,
+    });
+    return res.status(400).json({
+      error: "invalid_json",
+      code: "INVALID_JSON",
+      message: "Malformed JSON in request body.",
+      requestId,
+      details: {},
     });
   }
 
